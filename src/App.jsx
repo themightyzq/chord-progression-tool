@@ -571,6 +571,78 @@ function App() {
         >
           Session Settings
         </div>
+        {/* Tempo Control */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
+          <label htmlFor="tempo-input" style={{ fontWeight: 700, fontSize: 18, marginRight: 6, color: "#232526" }}>
+            Tempo:
+          </label>
+          <input
+            id="tempo-input"
+            type="number"
+            min={40}
+            max={240}
+            value={tempo}
+            onChange={e => setTempo(Number(e.target.value))}
+            style={{
+              fontSize: 22,
+              width: 80,
+              borderRadius: 8,
+              border: "1.5px solid #bbb",
+              background: "#fff",
+              fontWeight: 700,
+              color: "#222",
+              boxShadow: "0 2px 8px #0001",
+              textAlign: "center",
+              outline: "none",
+              marginRight: 8,
+            }}
+            aria-label="Tempo (BPM)"
+          />
+          <span style={{ fontWeight: 600, fontSize: 18, color: "#232526" }}>BPM</span>
+        </div>
+        {/* Play/Stop Buttons */}
+        <div style={{ display: "flex", gap: 16, marginBottom: 24 }}>
+          <button
+            style={{
+              background: "#1976d2",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              padding: "8px 28px",
+              fontWeight: 700,
+              fontSize: 20,
+              cursor: isPlaying ? "not-allowed" : "pointer",
+              opacity: isPlaying ? 0.6 : 1,
+              boxShadow: "0 1px 4px #0001",
+              transition: "background 0.2s, box-shadow 0.2s",
+            }}
+            onClick={handlePlay}
+            disabled={isPlaying}
+            aria-label="Play progression"
+          >
+            Play
+          </button>
+          <button
+            style={{
+              background: "#eee",
+              color: "#888",
+              border: "none",
+              borderRadius: 8,
+              padding: "8px 28px",
+              fontWeight: 700,
+              fontSize: 20,
+              cursor: isPlaying ? "pointer" : "not-allowed",
+              opacity: isPlaying ? 1 : 0.6,
+              boxShadow: "0 1px 4px #0001",
+              transition: "background 0.2s, box-shadow 0.2s",
+            }}
+            onClick={handleStop}
+            disabled={!isPlaying}
+            aria-label="Stop playback"
+          >
+            Stop
+          </button>
+        </div>
         {/* Key Dropdown */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
           <label htmlFor="key-dropdown" style={{ fontWeight: 700, fontSize: 18, marginRight: 6, color: "#232526" }}>
