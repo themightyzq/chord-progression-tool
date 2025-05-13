@@ -29,17 +29,17 @@ Built with Python and PyQt5, it provides:
    cd chord-progression-tool
 
 (Optional) Create & activate a virtualenv:
-python3 -m venv venv
-source venv/bin/activate
+"python3 -m venv venv
+source venv/bin/activate"
 
 Install PortAudio (macOS):
-brew install portaudio
+"brew install portaudio"
 
 Install Python deps:
-pip install PyQt5 numpy sounddevice mido
+"pip install PyQt5 numpy sounddevice mido"
 
 ▶️ Running the App
-python [main.py](http://_vscodecontentref_/0)
+"python main.py"
 
 💾 Exporting as MIDI
 Build your progression in the UI
