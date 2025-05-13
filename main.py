@@ -350,17 +350,38 @@ class StructurePanel(QWidget):
                 card_layout.setSpacing(10)
                 card_layout.setContentsMargins(12, 8, 12, 8)
                 # Play button
+                from PyQt5.QtGui import QIcon, QPixmap, QPainter, QBrush, QPolygon
+                from PyQt5.QtCore import QPoint
+
+                # Create a small play icon (white triangle)
+                small_play_pixmap = QPixmap(24, 24)
+                small_play_pixmap.fill(Qt.transparent)
+                painter = QPainter(small_play_pixmap)
+                painter.setRenderHint(QPainter.Antialiasing)
+                painter.setBrush(QBrush(Qt.white))
+                painter.setPen(Qt.NoPen)
+                triangle = QPolygon([QPoint(7, 4), QPoint(19, 12), QPoint(7, 20)])
+                painter.drawPolygon(triangle)
+                painter.end()
+                small_play_icon = QIcon(small_play_pixmap)
+
                 play_btn = QPushButton(card)
-                play_btn.setFixedSize(44, 44)
+                play_btn.setIcon(small_play_icon)
+                play_btn.setIconSize(small_play_pixmap.size())
+                play_btn.setFixedSize(36, 36)
                 play_btn.setStyleSheet(
-                    f"QPushButton {{"
-                    f"background: {color}; color: #fff; border-radius: 22px; font-size: 20px; font-weight: bold; text-align: center;"
-                    f"padding: 0; margin: 0;"
-                    f"}}"
-                    f"QPushButton:focus {{ box-shadow: 0 0 0 3px {color}44; }}"
-                    f"QPushButton:pressed {{ background: {color}; opacity: 0.8; }}"
+                    """
+                    QPushButton {
+                        background: #1976d2;
+                        border-radius: 10px;
+                        border: none;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+                    }
+                    QPushButton:pressed {
+                        background: #1565c0;
+                    }
+                    """
                 )
-                play_btn.setText("▶")
                 play_btn.setFocusPolicy(Qt.StrongFocus)
                 play_btn.setToolTip("Preview this chord")
                 def make_play(idx):
@@ -519,7 +540,14 @@ class StructurePanel(QWidget):
                 padding: 20px;
             }
             QGroupBox {
-                background-color: transparent;
+                background-color: #ffffff;
+                border-radius: 12px;
+            }
+            QRadioButton {
+                background-color: #ffffff;
+            }
+            QWidget {
+                background-color: #ffffff;
             }
         """)
 
@@ -563,6 +591,8 @@ class StructurePanel(QWidget):
         voicing_options = ["None", "Root", "Open", "Drop 2", "Custom"]
         for voicing in voicing_options:
             radio = QRadioButton(voicing)
+            if voicing == "Custom":
+                radio.setToolTip("Custom voicing is not implemented and has no effect.")
             voicing_group.addButton(radio)
             voicing_layout.addWidget(radio)
             voicing_radios.append(radio)
@@ -780,6 +810,7 @@ class SettingsPanel(QWidget):
         self.key_combo.setStyleSheet(
             "QComboBox {font-size: 16pt; border-radius: 8px; padding: 4px 16px; border: 1.5px solid #bbb; background: #fff;}"
             "QComboBox:focus { border: 2px solid #1976d2; }"
+            "QAbstractItemView { background: #fff; }"
         )
         self.key_combo.setFocusPolicy(Qt.StrongFocus)
         self.key_combo.setToolTip("Select key (Tab to focus, arrows to change)")
@@ -829,6 +860,7 @@ class SettingsPanel(QWidget):
         self.mode_combo.setStyleSheet(
             "QComboBox {font-size: 16pt; border-radius: 8px; padding: 4px 16px; border: 1.5px solid #bbb; background: #fff;}"
             "QComboBox:focus { border: 2px solid #1976d2; }"
+            "QAbstractItemView { background: #fff; }"
         )
         self.mode_combo.setFocusPolicy(Qt.StrongFocus)
         self.mode_combo.setToolTip("Select mode (Tab to focus, arrows to change)")
