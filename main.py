@@ -880,6 +880,8 @@ class SettingsPanel(QWidget):
         main_layout.addWidget(card_frame)
         self.setLayout(main_layout)
 
+from functools import partial
+
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
@@ -926,6 +928,9 @@ class MainWindow(QWidget):
         import numpy as np
         import sounddevice as sd
 
+        # Add a lock to prevent concurrent audio playback
+        self.audio_lock = threading.Lock()
+
         def play_chord_tone(self, notes, duration=0.5, fs=44100):
             print(f"[DEBUG] play_chord_tone called with notes: {notes}")
             if not notes or not all(isinstance(f, (int, float)) and f > 0 for f in notes):
@@ -941,20 +946,26 @@ class MainWindow(QWidget):
                 return
             audio = audio / np.max(np.abs(audio))
             print("[DEBUG] Playing audio buffer with sounddevice.")
-            sd.play(audio, fs)
-            sd.wait()
+            # Ensure only one playback at a time
+            with self.audio_lock:
+                sd.play(audio, fs)
+                sd.wait()
         setattr(MainWindow, "play_chord_tone", play_chord_tone)
 
         def on_play():
             self.is_playing = True
             print("Playback started at", self.tempo, "BPM")
+            from PyQt5.QtCore import QTimer
             def play_loop():
+                print(f"[DEBUG] chord_progression at start of playback: {self.chord_progression}")
                 for idx, chord in enumerate(self.chord_progression):
                     if not self.is_playing:
                         break
-                    self.structure_panel.highlight_card(idx)
+                    print(f"[DEBUG] chord at idx={idx}: {chord}")
+                    # Use QTimer.singleShot with functools.partial to capture idx
+                    QTimer.singleShot(0, partial(self.structure_panel.highlight_card, idx))
                     print(f"[DEBUG] Playing chord idx={idx}: {chord}")
-                    freqs = get_chord_frequencies(
+                    freqs = self.get_chord_frequencies(
                         chord["roman"],
                         chord.get("extension"),
                         chord.get("inversion"),
@@ -965,7 +976,8 @@ class MainWindow(QWidget):
                     print(f"[DEBUG] Frequencies for chord: {freqs}")
                     print(f"Playing: {chord['roman']} {chord.get('extension') or ''} {chord.get('inversion') or ''}")
                     self.play_chord_tone(freqs, duration=60/self.tempo)
-                self.structure_panel.highlight_card(-1)
+                # Clear highlight at end
+                QTimer.singleShot(0, partial(self.structure_panel.highlight_card, -1))
                 self.is_playing = False
             threading.Thread(target=play_loop, daemon=True).start()
 
