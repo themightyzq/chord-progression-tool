@@ -562,7 +562,7 @@ class StructurePanel(QWidget):
         ext_layout = QGridLayout()
         ext_group = QButtonGroup(dialog)
         ext_radios = []
-        ext_options = ["None", "+7th", "+9th", "sus2", "sus4"]
+        ext_options = ["None", "+6th", "+7th", "+9th", "sus2", "sus4"]
         for i, opt in enumerate(ext_options):
             radio = QRadioButton(opt)
             ext_group.addButton(radio)
@@ -1158,7 +1158,11 @@ class MainWindow(QWidget):
             }
             notes = roman_map.get(roman, triads[0])
             # Apply extension, inversion, voicing as in export_midi
-            if extension == "+7th":
+            if extension == "+6th":
+                # Add 6th degree
+                sixth = scale_note_names[(roman_to_degree[roman] + 5) % len(scale_note_names)]
+                notes = notes + [sixth]
+            elif extension == "+7th":
                 # Add 7th degree
                 seventh = scale_note_names[(roman_to_degree[roman] + 6) % len(scale_note_names)]
                 notes = notes + [seventh]
