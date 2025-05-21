@@ -73,15 +73,21 @@ class ChordPanel(QWidget):
         # Chord wheel group (centered with header)
         from PyQt5.QtGui import QFont
         wheel = QWidget(card_frame)
-        wheel.setFixedSize(420, 420)
+        # make it exactly as wide as the panel minus margins (16px each side)
+        wheel.setFixedSize(PANEL_W - 32, PANEL_W - 32)
 
-        wheel_container = QVBoxLayout()
-        wheel_container.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        wheel_container.setSpacing(0)
-        wheel_container.addWidget(header, alignment=Qt.AlignHCenter)
-        wheel_container.addSpacing(8)
-        wheel_container.addWidget(wheel, alignment=Qt.AlignHCenter)
-        card_layout.addLayout(wheel_container)
+        # Create a container widget for header + wheel for easier centering
+        wheel_group = QWidget(card_frame)
+        wheel_group_layout = QVBoxLayout(wheel_group)
+        wheel_group_layout.setContentsMargins(0, 0, 0, 0)
+        wheel_group_layout.setSpacing(8)
+        wheel_group_layout.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        wheel_group_layout.addWidget(header, alignment=Qt.AlignHCenter)
+        wheel_group_layout.addWidget(wheel, alignment=Qt.AlignHCenter)
+
+        # Add stretch above and below to center the wheel group in the panel
+        card_layout.addStretch(1)
+        card_layout.addWidget(wheel_group, alignment=Qt.AlignHCenter | Qt.AlignVCenter)
         card_layout.addStretch(1)
         self.roman_numerals = ["I", "ii", "iii", "IV", "V", "vi", "vii°"]
         self.btns = []
@@ -90,11 +96,15 @@ class ChordPanel(QWidget):
             "ii": "#388e3c", "iii": "#388e3c", "vi": "#388e3c",
             "vii°": "#d32f2f"
         }
+        # compute center & radius based on the actual wheel size
+        size = wheel.width()
+        center = size / 2
+        radius = center - 60   # bring the roman‐numeral buttons in closer to center
+
         for i, roman in enumerate(self.roman_numerals):
-            angle = (i / 7) * 2 * math.pi - (math.pi / 2)
-            radius = 120  # Reduced radius for better spacing
-            x = 210 + radius * math.cos(angle) - 40  # Adjusted offsets for centering
-            y = 210 + radius * math.sin(angle) - 40
+            angle = (i / len(self.roman_numerals)) * 2 * math.pi - (math.pi / 2)
+            x = center + radius * math.cos(angle) - 40
+            y = center + radius * math.sin(angle) - 40
             btn = QPushButton(roman, wheel)
             btn.setMinimumSize(90, 90)
             btn.setMaximumSize(90, 90)
@@ -136,9 +146,10 @@ class ChordPanel(QWidget):
         # Central "ADD CHORD" button in the wheel
         add_chord_center = QPushButton("ADD\nCHORD", wheel)
         add_chord_center.setFixedSize(130, 130)
+        # Center the button exactly in the wheel
         add_chord_center.move(
-            (wheel.width()  - 120) // 2,
-            (wheel.height() - 120) // 2
+            (wheel.width() - add_chord_center.width()) // 2,
+            (wheel.height() - add_chord_center.height()) // 2
         )
         font_center = QFont("Palatino")
         if not font_center.exactMatch():
@@ -527,12 +538,10 @@ class StructurePanel(QWidget):
                 )
 
     def show_modifier_popup(self, idx):
-        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QRadioButton, QButtonGroup, QDialogButtonBox, QGroupBox, QScrollArea
-        
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QRadioButton, QButtonGroup, QDialogButtonBox, QGroupBox
+
         dialog = QDialog(self)
         dialog.setWindowTitle("Edit Chord Modifiers")
-        dialog.setFixedSize(400, 600)
-        # Fix: force white background and rounded corners on the dialog
         dialog.setStyleSheet("""
             QDialog {
                 background-color: #ffffff;
@@ -540,8 +549,25 @@ class StructurePanel(QWidget):
                 padding: 20px;
             }
             QGroupBox {
-                background-color: #ffffff;
-                border-radius: 12px;
+                margin-top: 24px;
+                padding-top: 16px;
+                font-family: Palatino, Georgia, serif;
+                font-size: 18pt;
+                font-weight: bold;
+                color: #222;
+                border: 1.5px solid #bbb;
+                border-radius: 10px;
+                background: #fff;
+            }
+            QGroupBox:title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                padding: 0 8px;
+                margin-top: -16px;
+                font-size: 18pt;
+                font-weight: bold;
+                color: #222;
+                background: transparent;
             }
             QRadioButton {
                 background-color: #ffffff;
@@ -551,15 +577,29 @@ class StructurePanel(QWidget):
             }
         """)
 
-        scroll_area = QScrollArea(dialog)
-        scroll_area.setWidgetResizable(True)
-        scroll_content = QWidget()
-        scroll_layout = QVBoxLayout(scroll_content)
-        scroll_layout.setSpacing(8)  # Reduced spacing between group boxes
+        dialog_layout = QVBoxLayout(dialog)
+        dialog_layout.setContentsMargins(24, 24, 24, 24)
+        dialog_layout.setSpacing(20)
 
-        # Add extension, inversion, and voicing groups to scrollable content
-        ext_groupbox = QGroupBox("Select Extension:")
+        # Add extension, inversion, and voicing groups with large QLabel headers and border-only QGroupBox
+
+        from PyQt5.QtGui import QFont
+
+        # --- Extension Section ---
+        ext_label = QLabel("Select Extension:")
+        ext_label_font = QFont("Palatino" if QFont("Palatino").exactMatch() else "Georgia")
+        ext_label_font.setPointSize(20)
+        ext_label_font.setWeight(QFont.Bold)
+        ext_label.setFont(ext_label_font)
+        ext_label.setStyleSheet("margin-top: 25px; margin-bottom: 25px;")
+        ext_label.setMinimumHeight(25)
+        dialog_layout.addWidget(ext_label)
+
+        ext_groupbox = QGroupBox()
+        ext_groupbox.setStyleSheet("QGroupBox { border: 2px solid #bbb; border-radius: 14px; margin-bottom: 10px; background: #fff; }")
         ext_layout = QGridLayout()
+        ext_layout.setHorizontalSpacing(16)
+        ext_layout.setVerticalSpacing(5)
         ext_group = QButtonGroup(dialog)
         ext_radios = []
         ext_options = ["None", "+6th", "+7th", "+9th", "sus2", "sus4"]
@@ -569,10 +609,22 @@ class StructurePanel(QWidget):
             ext_layout.addWidget(radio, i // 2, i % 2)
             ext_radios.append(radio)
         ext_groupbox.setLayout(ext_layout)
-        scroll_layout.addWidget(ext_groupbox)
+        dialog_layout.addWidget(ext_groupbox)
 
-        inv_groupbox = QGroupBox("Select Inversion:")
+        # --- Inversion Section ---
+        inv_label = QLabel("Select Inversion:")
+        inv_label_font = QFont("Palatino" if QFont("Palatino").exactMatch() else "Georgia")
+        inv_label_font.setPointSize(20)
+        inv_label_font.setWeight(QFont.Bold)
+        inv_label.setFont(inv_label_font)
+        inv_label.setStyleSheet("margin-top: 25px; margin-bottom: 25px;")
+        inv_label.setMinimumHeight(25)
+        dialog_layout.addWidget(inv_label)
+
+        inv_groupbox = QGroupBox()
+        inv_groupbox.setStyleSheet("QGroupBox { border: 2px solid #bbb; border-radius: 14px; margin-bottom: 18px; background: #fff; }")
         inv_layout = QVBoxLayout()
+        inv_layout.setSpacing(5)
         inv_group = QButtonGroup(dialog)
         inv_radios = []
         inv_options = ["None", "Root", "1st", "2nd"]
@@ -582,10 +634,22 @@ class StructurePanel(QWidget):
             inv_layout.addWidget(radio)
             inv_radios.append(radio)
         inv_groupbox.setLayout(inv_layout)
-        scroll_layout.addWidget(inv_groupbox)
+        dialog_layout.addWidget(inv_groupbox)
 
-        voicing_groupbox = QGroupBox("Select Voicing:")
+        # --- Voicing Section ---
+        voicing_label = QLabel("Select Voicing:")
+        voicing_label_font = QFont("Palatino" if QFont("Palatino").exactMatch() else "Georgia")
+        voicing_label_font.setPointSize(20)
+        voicing_label_font.setWeight(QFont.Bold)
+        voicing_label.setFont(voicing_label_font)
+        voicing_label.setStyleSheet("margin-top: 25px; margin-bottom: 25px;")
+        voicing_label.setMinimumHeight(25)
+        dialog_layout.addWidget(voicing_label)
+
+        voicing_groupbox = QGroupBox()
+        voicing_groupbox.setStyleSheet("QGroupBox { border: 2px solid #bbb; border-radius: 14px; margin-bottom: 18px; background: #fff; }")
         voicing_layout = QVBoxLayout()
+        voicing_layout.setSpacing(5)
         voicing_group = QButtonGroup(dialog)
         voicing_radios = []
         voicing_options = ["None", "Root", "Open", "Drop 2", "Custom"]
@@ -597,10 +661,7 @@ class StructurePanel(QWidget):
             voicing_layout.addWidget(radio)
             voicing_radios.append(radio)
         voicing_groupbox.setLayout(voicing_layout)
-        scroll_layout.addWidget(voicing_groupbox)
-
-        scroll_content.setLayout(scroll_layout)
-        scroll_area.setWidget(scroll_content)
+        dialog_layout.addWidget(voicing_groupbox)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.button(QDialogButtonBox.Ok).setStyleSheet(
@@ -613,12 +674,12 @@ class StructurePanel(QWidget):
             "QPushButton:focus { box-shadow: 0 0 0 3px #8884; }"
             "QPushButton:pressed { background: #e0e0e0; }"
         )
-
-        # Add scroll area and buttons to dialog layout
-        dialog_layout = QVBoxLayout(dialog)
-        dialog_layout.addWidget(scroll_area)
         dialog_layout.addWidget(buttons)
         dialog.setLayout(dialog_layout)
+
+        # Let Qt compute the required size for all content, then fix the dialog size
+        dialog.adjustSize()
+        dialog.setFixedSize(dialog.size())
 
         # Preselect current values
         chord = self.chords[idx]
@@ -1200,9 +1261,10 @@ class MainWindow(QWidget):
 
         # Set tab order for accessibility (explicitly across panels)
         if hasattr(self.chord_panel, "add_btn"):
-            self.setTabOrder(self.chord_panel.add_btn, self.structure_panel)
-        if hasattr(self.structure_panel, "card_widgets") and self.structure_panel.card_widgets:
-            self.setTabOrder(self.structure_panel.card_widgets[-1], self.settings_panel.tempo_spin)
+            self.setTabOrder(self.chord_panel.add_btn, self.settings_panel.play_btn)
+        if hasattr(self.settings_panel, "play_btn") and hasattr(self.settings_panel, "stop_btn") and hasattr(self.settings_panel, "tempo_spin"):
+            self.setTabOrder(self.settings_panel.play_btn, self.settings_panel.stop_btn)
+            self.setTabOrder(self.settings_panel.stop_btn, self.settings_panel.tempo_spin)
         self.setTabOrder(self.settings_panel.tempo_spin, self.settings_panel.key_combo)
         self.setTabOrder(self.settings_panel.key_combo, self.settings_panel.mode_combo)
         self.setTabOrder(self.settings_panel.mode_combo, self.settings_panel.play_btn)
@@ -1299,5 +1361,9 @@ if __name__ == "__main__":
     if hasattr(window.settings_panel, "play_btn") and hasattr(window.settings_panel, "stop_btn") and hasattr(window.settings_panel, "tempo_spin"):
         window.setTabOrder(window.settings_panel.play_btn, window.settings_panel.stop_btn)
         window.setTabOrder(window.settings_panel.stop_btn, window.settings_panel.tempo_spin)
+    window.setTabOrder(window.settings_panel.tempo_spin, window.settings_panel.key_combo)
+    window.setTabOrder(window.settings_panel.key_combo, window.settings_panel.mode_combo)
+    window.setTabOrder(window.settings_panel.mode_combo, window.settings_panel.play_btn)
+
     window.show()
     app.exec_()
