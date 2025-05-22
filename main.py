@@ -751,31 +751,8 @@ class SettingsPanel(QWidget):
         form.setHorizontalSpacing(16)
         form.setVerticalSpacing(24)
 
-        # Pattern bars and quantization controls (now global)
-        bars_label = QLabel("Bars:")
-        self.bars_combo = QComboBox()
-        self.bars_combo.addItems(["1", "2", "4", "8"])
-        self.bars_combo.setCurrentText(str(pattern_bars))
-        self.bars_combo.setFixedWidth(60)
-        self.bars_combo.currentTextChanged.connect(set_pattern_bars)
+        # (Bars and quantization controls removed)
 
-        quant_label = QLabel("Quantization:")
-        self.quant_combo = QComboBox()
-        self.quant_combo.addItems(["Whole", "Half", "Quarter", "Eighth", "Sixteenth"])
-        self.quant_combo.setCurrentText(quantization)
-        self.quant_combo.setFixedWidth(100)
-        self.quant_combo.currentTextChanged.connect(set_quantization)
-
-        pattern_row = QWidget()
-        pattern_row_layout = QHBoxLayout(pattern_row)
-        pattern_row_layout.setContentsMargins(0, 0, 0, 0)
-        pattern_row_layout.setSpacing(12)
-        pattern_row_layout.addWidget(bars_label)
-        pattern_row_layout.addWidget(self.bars_combo)
-        pattern_row_layout.addWidget(quant_label)
-        pattern_row_layout.addWidget(self.quant_combo)
-        pattern_row_layout.addStretch(1)
-        form.addRow(pattern_row)
 
         # Tempo row
         tempo_label = QLabel("Tempo:")
@@ -973,6 +950,7 @@ class SettingsPanel(QWidget):
 # This is the fourth "layer" in the UI, full-width, anchored under Chord, Structure, and Settings panels.
 # ==========================
 from PyQt5.QtWidgets import QScrollArea, QComboBox, QCheckBox, QSizePolicy
+from PyQt5.QtCore import Qt
 
 class PatternEditorPanel(QWidget):
     """
@@ -980,11 +958,9 @@ class PatternEditorPanel(QWidget):
     Users can click and drag to create, move, and resize colored blocks representing chord events of arbitrary length.
     Multiple chords can overlap in time.
     """
-    def __init__(self, chords, pattern_bars=2, quantization="Sixteenth"):
+    def __init__(self, chords):
         super().__init__()
         self.chords = chords
-        self.pattern_bars = pattern_bars
-        self.quantization = quantization
         self.blocks = []  # Each block: {"chord_idx": int, "start": int, "length": int, "color": QColor}
         self.selected_block = None
         self.dragging = False
@@ -996,9 +972,8 @@ class PatternEditorPanel(QWidget):
         self.colors = [
             "#1976d2", "#388e3c", "#d32f2f", "#fbc02d", "#7b1fa2", "#0288d1", "#c2185b"
         ]
-        self.quant_options = ["Whole", "Half", "Quarter", "Eighth", "Sixteenth"]
-        self.quant_to_steps = {"Whole": 1, "Half": 2, "Quarter": 4, "Eighth": 8, "Sixteenth": 16}
-        self.grid_steps = self.pattern_bars * self.quant_to_steps[self.quantization]
+        # Fixed grid: 32 steps, always integer step grid
+        self.grid_steps = 32
         self.grid_height = 40
         self.header_height = 30
         self.left_margin = 60
@@ -1009,12 +984,8 @@ class PatternEditorPanel(QWidget):
         self.setLayout(QVBoxLayout(self))
 
     def set_bars(self, val):
-        self.pattern_bars = int(val)
-        self.grid_steps = self.pattern_bars * self.quant_to_steps[self.quantization]
         self.update()
     def set_quant(self, val):
-        self.quantization = val
-        self.grid_steps = self.pattern_bars * self.quant_to_steps[self.quantization]
         self.update()
     def set_chords(self, chords):
         self.chords = chords
@@ -1025,24 +996,35 @@ class PatternEditorPanel(QWidget):
             x, y = event.x(), event.y()
             col, row = self.xy_to_grid(x, y)
             if row is not None and col is not None:
+                col = int(round(col))
+                col = max(0, min(self.grid_steps - 1, col))
+                cell_w = self.cell_width()
+                grid_left = self.left_margin
+                grid_top = self.header_height + self.top_margin
                 # Check if clicking on an existing block
                 for block in reversed(self.blocks):
                     if block["chord_idx"] == row and block["start"] <= col < block["start"] + block["length"]:
-                        self.selected_block = block
-                        self.dragging = True
-                        self.drag_start = (col, row, block["start"], block["length"])
-                        # Check for resizing (near left/right edge)
-                        if abs(col - block["start"]) <= 0:
+                        # Compute pixel x-coordinates for block edges
+                        block_x_left = grid_left + block["start"] * cell_w
+                        block_x_right = grid_left + (block["start"] + block["length"]) * cell_w
+                        # Mouse x relative to grid
+                        mouse_x = x
+                        # Detect edge proximity (6px threshold)
+                        if abs(mouse_x - block_x_left) <= 6:
                             self.resizing = True
                             self.resize_dir = "left"
-                        elif abs(col - (block["start"] + block["length"] - 1)) <= 0:
+                        elif abs(mouse_x - block_x_right) <= 6:
                             self.resizing = True
                             self.resize_dir = "right"
                         else:
                             self.resizing = False
+                            self.resize_dir = None
+                        self.selected_block = block
+                        self.dragging = True
+                        self.drag_start = (col, row, block["start"], block["length"])
                         self.update()
                         return
-                # Otherwise, create a new block
+                # Otherwise, create a new block (length 1)
                 color = self.colors[row % len(self.colors)]
                 new_block = {"chord_idx": row, "start": col, "length": 1, "color": color}
                 self.blocks.append(new_block)
@@ -1050,28 +1032,78 @@ class PatternEditorPanel(QWidget):
                 self.dragging = True
                 self.drag_start = (col, row, col, 1)
                 self.resizing = False
+                self.resize_dir = None
                 self.update()
     def mouseMoveEvent(self, event):
+        x, y = event.x(), event.y()
+        # Resizing/moving logic if dragging
         if self.dragging and self.selected_block:
-            x, y = event.x(), event.y()
             col, row = self.xy_to_grid(x, y)
             if col is not None and row == self.selected_block["chord_idx"]:
+                col = int(round(col))
+                col = max(0, min(self.grid_steps - 1, col))
                 if self.resizing:
-                    # Resize block
+                    # Resize block (snap to integer steps)
                     if self.resize_dir == "right":
                         new_length = max(self.block_min_length, col - self.selected_block["start"] + 1)
                         self.selected_block["length"] = min(new_length, self.grid_steps - self.selected_block["start"])
+                        # Clamp to max 32
+                        self.selected_block["length"] = min(self.selected_block["length"], 32)
                     elif self.resize_dir == "left":
                         end = self.selected_block["start"] + self.selected_block["length"]
                         new_start = min(max(0, col), end - self.block_min_length)
                         self.selected_block["length"] = end - new_start
                         self.selected_block["start"] = new_start
+                        # Clamp to min 1, max 32
+                        if self.selected_block["length"] < 1:
+                            self.selected_block["length"] = 1
+                        if self.selected_block["length"] > 32:
+                            self.selected_block["length"] = 32
                 else:
-                    # Move block
+                    # Move block (snap to integer steps)
                     offset = col - self.drag_start[0]
                     new_start = min(max(0, self.drag_start[2] + offset), self.grid_steps - self.selected_block["length"])
                     self.selected_block["start"] = new_start
             self.update()
+        else:
+            # Cursor feedback for resizing
+            col, row = self.xy_to_grid(x, y)
+            cell_w = self.cell_width()
+            grid_left = self.left_margin
+            grid_top = self.header_height + self.top_margin
+            found_edge = False
+            if row is not None and col is not None:
+                mouse_x = x
+                for block in reversed(self.blocks):
+                    if block["chord_idx"] == row and block["start"] <= col < block["start"] + block["length"]:
+                        block_x_left = grid_left + block["start"] * cell_w
+                        block_x_right = grid_left + (block["start"] + block["length"]) * cell_w
+                        if abs(mouse_x - block_x_left) <= 6:
+                            self.setCursor(Qt.SizeHorCursor)
+                            found_edge = True
+                            break
+                        elif abs(mouse_x - block_x_right) <= 6:
+                            self.setCursor(Qt.SizeHorCursor)
+                            found_edge = True
+                            break
+            if not found_edge:
+                self.setCursor(Qt.ArrowCursor)
+    def contextMenuEvent(self, event):
+        # Right-click context menu for deleting a block
+        x, y = event.x(), event.y()
+        col, row = self.xy_to_grid(x, y)
+        if row is not None and col is not None:
+            for block in reversed(self.blocks):
+                if block["chord_idx"] == row and block["start"] <= col < block["start"] + block["length"]:
+                    from PyQt5.QtWidgets import QMenu
+                    menu = QMenu(self)
+                    delete_action = menu.addAction("Delete Block")
+                    action = menu.exec_(self.mapToGlobal(event.pos()))
+                    if action == delete_action:
+                        self.blocks.remove(block)
+                        self.selected_block = None
+                        self.update()
+                    break
     def mouseReleaseEvent(self, event):
         self.dragging = False
         self.resizing = False
@@ -1084,7 +1116,7 @@ class PatternEditorPanel(QWidget):
         row = (y - grid_top) // self.grid_height
         col = (x - grid_left) // self.cell_width()
         if 0 <= row < len(self.chords) and 0 <= col < self.grid_steps:
-            return int(col), int(row)
+            return int(round(col)), int(row)
         return None, None
     def cell_width(self):
         w = max(1, (self.width() - self.left_margin - self.right_margin) // max(1, self.grid_steps))
@@ -1093,6 +1125,8 @@ class PatternEditorPanel(QWidget):
         from PyQt5.QtGui import QPainter, QColor, QPen, QBrush
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
+        # Set clip rect for safe rendering
+        painter.setClipRect(self.rect())
         # Draw grid
         grid_top = self.header_height + self.top_margin
         grid_left = self.left_margin
@@ -1117,6 +1151,8 @@ class PatternEditorPanel(QWidget):
             painter.setPen(QPen(QColor("#ff9800"), 2))
             painter.setBrush(Qt.NoBrush)
             painter.drawLine(x, self.top_margin, x, self.top_margin + self.header_height + len(self.chords) * self.grid_height)
+        # Duration value map for musical terms
+        value_map = {1: "1/16", 2: "1/8", 4: "1/4", 8: "1/2", 16: "1"}
         # Draw blocks
         for block in self.blocks:
             row = block["chord_idx"]
@@ -1135,6 +1171,11 @@ class PatternEditorPanel(QWidget):
                 painter.setPen(QPen(color.darker(150), 2))
                 painter.setBrush(QBrush(color.lighter(120)))
             painter.drawRect(x, y, w, h)
+            # Draw duration label inside block (musical value)
+            painter.setPen(QColor("#333"))
+            length = block['length']
+            label = value_map.get(length, f"{length}/16")
+            painter.drawText(x + 6, y + 24, label)
             # Draw selection
             if block is self.selected_block:
                 painter.setPen(QPen(QColor("#ff9800"), 3))
@@ -1242,6 +1283,8 @@ class MainWindow(QWidget):
             print("Playback started at", self.tempo, "BPM")
             from PyQt5.QtCore import QTimer
             import time
+            import numpy as np
+            import sounddevice as sd
 
             # Get pattern info
             pattern_panel = getattr(self, "pattern_panel", None)
@@ -1280,23 +1323,27 @@ class MainWindow(QWidget):
             else:
                 step_duration = 60 / bpm / 4
 
+            # Reduce playback duration to 85% of step duration to avoid overlap
+            note_play_duration = step_duration * 0.88
+            fs = 44100
+
             def play_loop():
                 print(f"[DEBUG] pattern_length: {pattern_length}, quant: {quant}, step_duration: {step_duration}")
-                last_played_blocks = set()
                 for step_idx in range(pattern_length):
                     if not self.is_playing:
                         break
                     # Highlight current step in pattern panel
                     if pattern_panel:
                         QTimer.singleShot(0, partial(pattern_panel.highlight_step, step_idx))
-                    # Play all blocks that start at this step
+                    # Play all active blocks at this step (polyphony)
                     if pattern_panel:
-                        starting_blocks = pattern_panel.get_blocks_starting_at(step_idx)
-                        for block in starting_blocks:
+                        active_blocks = pattern_panel.get_active_blocks(step_idx)
+                        freqs = []
+                        for block in active_blocks:
                             chord_idx = block["chord_idx"]
                             if 0 <= chord_idx < len(self.chord_progression):
                                 chord = self.chord_progression[chord_idx]
-                                freqs = self.get_chord_frequencies(
+                                block_freqs = self.get_chord_frequencies(
                                     chord["roman"],
                                     chord.get("extension"),
                                     chord.get("inversion"),
@@ -1304,9 +1351,20 @@ class MainWindow(QWidget):
                                     key=self.key,
                                     mode=self.mode
                                 )
-                                duration = block["length"] * step_duration
-                                print(f"[DEBUG] Playing chord {chord['roman']} at step {step_idx+1}: {freqs} for duration {duration}")
-                                self.play_chord_tone(freqs, duration=duration)
+                                freqs.extend(block_freqs)
+                        # Remove duplicates for polyphony, but allow all notes
+                        if freqs:
+                            # Sum sine waves for all frequencies, play together
+                            t = np.linspace(0, note_play_duration, int(fs * note_play_duration), False)
+                            audio = np.zeros_like(t)
+                            for freq in freqs:
+                                audio += 0.3 * np.sin(2 * np.pi * freq * t)
+                            # Normalize
+                            if np.max(np.abs(audio)) > 0:
+                                audio = audio / np.max(np.abs(audio))
+                                with self.audio_lock:
+                                    sd.play(audio, fs)
+                                    sd.wait()
                     time.sleep(step_duration)
                 # Clear highlight at end
                 if pattern_panel:
@@ -1336,9 +1394,11 @@ class MainWindow(QWidget):
 
             note_map = {
                 "C": 60, "C#": 61, "D": 62, "D#": 63, "E": 64, "F": 65, "F#": 66,
-                "G": 67, "G#": 68, "A": 69, "A#": 70, "B": 71
+                "G": 67, "G#": 68, "A": 69, "A#": 70, "B": 71,
+                "Db": 61, "Eb": 63, "Gb": 66, "Ab": 68, "Bb": 70
             }
             def get_midi_notes(roman, extension=None, inversion=None, voicing=None, key="C"):
+                # This function should match the get_chord_frequencies logic as close as possible
                 roman_map = {
                     "I": ["C", "E", "G"],
                     "ii": ["D", "F", "A"],
@@ -1380,18 +1440,78 @@ class MainWindow(QWidget):
             tempo = mido.bpm2tempo(bpm)
             track.append(mido.MetaMessage('set_tempo', tempo=tempo))
             ticks_per_beat = mid.ticks_per_beat
-            for chord in self.chord_progression:
-                notes = get_midi_notes(
-                    chord["roman"],
-                    chord.get("extension"),
-                    chord.get("inversion"),
-                    chord.get("voicing"),
-                    key=self.key
-                )
-                for n in notes:
-                    track.append(mido.Message('note_on', note=n, velocity=80, time=0))
-                for i, n in enumerate(notes):
-                    track.append(mido.Message('note_off', note=n, velocity=64, time=ticks_per_beat if i == 0 else 0))
+
+            # Use pattern editor blocks for MIDI, reflecting all overlapping chords and durations
+            pattern_panel = getattr(self, "pattern_panel", None)
+            bars = getattr(pattern_panel, "pattern_bars", 1) if pattern_panel else 1
+            quant = getattr(pattern_panel, "quantization", "Sixteenth") if pattern_panel else "Sixteenth"
+            quant_to_steps = {"Whole": 1, "Half": 2, "Quarter": 4, "Eighth": 8, "Sixteenth": 16}
+            grid_steps = bars * 16
+            if pattern_panel:
+                blocks = list(pattern_panel.blocks)
+            else:
+                blocks = []
+            # Each step is a time point; for each block, schedule note_on at start, note_off at end
+            # Build a list of note events: (step, onoff, midi_note, block)
+            events = []
+            for block in blocks:
+                chord_idx = block["chord_idx"]
+                if 0 <= chord_idx < len(self.chord_progression):
+                    chord = self.chord_progression[chord_idx]
+                    notes = get_midi_notes(
+                        chord["roman"],
+                        chord.get("extension"),
+                        chord.get("inversion"),
+                        chord.get("voicing"),
+                        key=self.key
+                    )
+                    start = block["start"]
+                    end = block["start"] + block["length"]
+                    for n in notes:
+                        events.append((start, "on", n))
+                        events.append((end, "off", n))
+            # Sort events by step, with note_off before note_on at same step
+            events.sort(key=lambda e: (e[0], 0 if e[1] == "off" else 1))
+            # Calculate ticks per step
+            # Each quantization step is a fraction of a quarter note
+            if quant == "Whole":
+                steps_per_bar = 1
+                ticks_per_step = ticks_per_beat * 4
+            elif quant == "Half":
+                steps_per_bar = 2
+                ticks_per_step = ticks_per_beat * 2
+            elif quant == "Quarter":
+                steps_per_bar = 4
+                ticks_per_step = ticks_per_beat
+            elif quant == "Eighth":
+                steps_per_bar = 8
+                ticks_per_step = ticks_per_beat // 2
+            elif quant == "Sixteenth":
+                steps_per_bar = 16
+                ticks_per_step = ticks_per_beat // 4
+            else:
+                steps_per_bar = 16
+                ticks_per_step = ticks_per_beat // 4
+            # Write all events in order, keeping track of time since last event
+            last_step = 0
+            last_event_time = 0
+            notes_on = set()
+            for i, event in enumerate(events):
+                step, onoff, n = event
+                delta_steps = step - last_step
+                delta_ticks = delta_steps * ticks_per_step
+                # For simultaneous events, only advance time for the first event at a new step
+                time_val = delta_ticks if i == 0 or step != last_step else 0
+                if onoff == "on":
+                    track.append(mido.Message('note_on', note=n, velocity=80, time=time_val))
+                    notes_on.add(n)
+                else:
+                    track.append(mido.Message('note_off', note=n, velocity=64, time=time_val))
+                    notes_on.discard(n)
+                last_step = step
+            # Ensure all notes are turned off at the end
+            for n in notes_on:
+                track.append(mido.Message('note_off', note=n, velocity=64, time=0))
             try:
                 mid.save(path)
                 QMessageBox.information(self, "Export Complete", f"MIDI file saved to:\n{path}")
@@ -1545,13 +1665,18 @@ class MainWindow(QWidget):
 
         # Pattern editor panel (full width, below columns)
         self.pattern_panel = PatternEditorPanel(self.chord_progression)
+        # Snap toggle: removed; quantization is always used for rounding only
+        # Wrap pattern editor in a scroll area for safe rendering
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(self.pattern_panel)
 
         # Main vertical layout for the window
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         main_layout.addLayout(columns_layout, 3)
-        main_layout.addWidget(self.pattern_panel, 1)
+        main_layout.addWidget(scroll, 1)
 
         self.setLayout(main_layout)
         self.setMinimumSize(1200, 800)  # Adjust window size to fit panels comfortably
