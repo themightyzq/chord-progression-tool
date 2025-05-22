@@ -1,3 +1,84 @@
+import threading
+import time
+import numpy as np
+
+import sounddevice as sd
+# --- SustainedSynth class for real-time note on/off audio playback ---
+class SustainedSynth:
+    """
+    Simple polyphonic synthesizer supporting sustained notes (note on/off, all_notes_off).
+    Uses a background audio callback and maintains active notes.
+    """
+    def __init__(self, fs=44100):
+        self.fs = fs
+        self.active_notes = {}  # frequency -> count
+        self.lock = threading.Lock()
+        self.stream = None
+        self.phase = {}
+        self.running = False
+
+    def start(self):
+        if self.stream is not None:
+            return
+        self.running = True
+        self.stream = sd.OutputStream(
+            samplerate=self.fs,
+            channels=1,
+            dtype="float32",
+            callback=self._callback,
+            blocksize=0,
+            finished_callback=self._on_stream_finished
+        )
+        self.stream.start()
+
+    def stop(self):
+        self.running = False
+        self.all_notes_off()
+        if self.stream is not None:
+            self.stream.stop()
+            self.stream.close()
+            self.stream = None
+        self.phase = {}
+
+    def note_on(self, freqs):
+        with self.lock:
+            for f in freqs:
+                self.phase[f] = self.phase.get(f, 0.0)
+                self.active_notes[f] = self.active_notes.get(f, 0) + 1
+
+    def note_off(self, freqs):
+        with self.lock:
+            for f in freqs:
+                if f in self.active_notes:
+                    self.active_notes[f] -= 1
+                    if self.active_notes[f] <= 0:
+                        del self.active_notes[f]
+                        self.phase.pop(f, None)
+
+    def all_notes_off(self):
+        with self.lock:
+            self.active_notes.clear()
+            self.phase = {}
+
+    def _callback(self, outdata, frames, time_info, status):
+        t = np.arange(frames) / self.fs
+        chunk = np.zeros(frames, dtype=np.float32)
+        with self.lock:
+            notes = list(self.active_notes)
+            for f in notes:
+                ph = self.phase.get(f, 0.0)
+                s = np.sin(2 * np.pi * f * t + ph)
+                chunk += 0.2 * s
+                # Update phase for next chunk
+                self.phase[f] = (ph + 2 * np.pi * f * frames / self.fs) % (2 * np.pi)
+        # Normalize and output
+        if len(self.active_notes) > 0:
+            chunk = chunk / max(1, len(self.active_notes))
+        outdata[:] = chunk.reshape(-1, 1)
+
+    def _on_stream_finished(self):
+        pass
+
 import sys
 import math
 from PyQt5.QtWidgets import (
@@ -982,6 +1063,24 @@ class PatternEditorPanel(QWidget):
         self.bottom_margin = 10
         self.block_min_length = 1
         self.setLayout(QVBoxLayout(self))
+        # --- Animated playhead state ---
+        self.playhead_anim = 0.0
+        self.playhead_anim_target = 0.0
+        from PyQt5.QtCore import QTimer
+        self.anim_timer = QTimer(self)
+        self.anim_timer.setInterval(16)
+        self.anim_timer.timeout.connect(self.update_playhead_anim)
+        self.anim_timer.start()
+        # --- Pulse for active (playing) blocks ---
+        import numpy as np
+        self.pulse_phase = 0.0
+        self.pulse_timer = QTimer(self)
+        self.pulse_timer.setInterval(32)
+        def update_pulse():
+            self.pulse_phase = (self.pulse_phase + 0.08) % (2 * np.pi)
+            self.update()
+        self.pulse_timer.timeout.connect(update_pulse)
+        self.pulse_timer.start()
 
     def set_bars(self, val):
         self.update()
@@ -1123,34 +1222,25 @@ class PatternEditorPanel(QWidget):
         return w
     def paintEvent(self, event):
         from PyQt5.QtGui import QPainter, QColor, QPen, QBrush
+        import numpy as np
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        # Set clip rect for safe rendering
         painter.setClipRect(self.rect())
-        # Draw grid
         grid_top = self.header_height + self.top_margin
         grid_left = self.left_margin
         cell_w = self.cell_width()
-        playhead = getattr(self, "playhead_step", -1)
-        # Draw grid and playhead
+        playhead = int(round(self.playhead_anim))
+        # Draw grid
         for row in range(len(self.chords)):
             y = grid_top + row * self.grid_height
-            # Chord label
             painter.setPen(QColor("#222"))
             painter.setFont(self.font())
             painter.drawText(8, y + self.grid_height // 2 + 8, self.chords[row]["roman"])
-            # Grid cells
             for col in range(self.grid_steps):
                 x = grid_left + col * cell_w
                 painter.setPen(QPen(QColor("#bbb"), 1))
                 painter.setBrush(QBrush(QColor("#fafafa")))
                 painter.drawRect(x, y, cell_w, self.grid_height)
-        # Draw playhead
-        if playhead is not None and playhead >= 0 and playhead < self.grid_steps:
-            x = grid_left + playhead * cell_w
-            painter.setPen(QPen(QColor("#ff9800"), 2))
-            painter.setBrush(Qt.NoBrush)
-            painter.drawLine(x, self.top_margin, x, self.top_margin + self.header_height + len(self.chords) * self.grid_height)
         # Duration value map for musical terms
         value_map = {1: "1/16", 2: "1/8", 4: "1/4", 8: "1/2", 16: "1"}
         # Draw blocks
@@ -1160,27 +1250,32 @@ class PatternEditorPanel(QWidget):
             y = grid_top + row * self.grid_height
             w = block["length"] * cell_w
             h = self.grid_height
-            # Highlight block if playhead is within its range
+            # Highlight block if playhead is within its range (legacy playhead_step for compatibility)
             is_playing = playhead is not None and block["start"] <= playhead < block["start"] + block["length"]
+            length = block['length']
+            label = value_map.get(length, f"{length}/16")
             if is_playing:
-                color = QColor("#ff9800")
-                painter.setPen(QPen(color.darker(150), 2))
-                painter.setBrush(QBrush(color.lighter(120)))
+                # Block is filled with half transparency, solid black border, black label.
+                base_color = QColor(block["color"])
+                base_color.setAlpha(128)  # half transparency
+                painter.setPen(QPen(Qt.black, 3))
+                painter.setBrush(base_color)
+                painter.drawRect(int(x), int(y), int(w), int(h))
+                painter.setPen(QColor(Qt.black))
+                painter.setFont(self.font())
+                painter.drawText(int(x) + 6, int(y) + 24, label)
             else:
                 color = QColor(block["color"])
                 painter.setPen(QPen(color.darker(150), 2))
                 painter.setBrush(QBrush(color.lighter(120)))
-            painter.drawRect(x, y, w, h)
-            # Draw duration label inside block (musical value)
-            painter.setPen(QColor("#333"))
-            length = block['length']
-            label = value_map.get(length, f"{length}/16")
-            painter.drawText(x + 6, y + 24, label)
+                painter.drawRect(int(x), int(y), int(w), int(h))
+                painter.setPen(QColor("#333"))
+                painter.drawText(int(x) + 6, int(y) + 24, label)
             # Draw selection
             if block is self.selected_block:
                 painter.setPen(QPen(QColor("#ff9800"), 3))
                 painter.setBrush(Qt.NoBrush)
-                painter.drawRect(x, y, w, h)
+                painter.drawRect(int(x), int(y), int(w), int(h))
         # Draw timeline header
         painter.setPen(QPen(QColor("#888"), 1))
         painter.setBrush(QBrush(QColor("#eee")))
@@ -1191,9 +1286,33 @@ class PatternEditorPanel(QWidget):
             painter.drawLine(x, self.top_margin, x, self.top_margin + self.header_height + len(self.chords) * self.grid_height)
             painter.setPen(QColor("#444"))
             painter.drawText(x + 2, self.top_margin + 18, str(col + 1))
+        # Draw playhead as a semi-transparent line ON TOP of blocks
+        if (
+            self.playhead_anim is not None
+            and self.playhead_anim >= 0
+            and self.playhead_anim < self.grid_steps
+        ):
+            x = grid_left + self.playhead_anim * cell_w
+            from PyQt5.QtGui import QColor, QPen
+            painter.setPen(QPen(QColor(255, 152, 0, 160), 4, Qt.SolidLine, Qt.RoundCap))
+            painter.drawLine(
+                int(x),
+                int(self.top_margin),
+                int(x),
+                int(self.top_margin + self.header_height + len(self.chords) * self.grid_height)
+            )
         painter.end()
     def highlight_step(self, step_idx):
-        # Optionally implement step highlighting for playback
+        # Animate playhead to the new step (can be float for animation)
+        self.playhead_anim_target = float(step_idx if step_idx is not None else -1)
+        self.update()
+
+    def update_playhead_anim(self):
+        # Smoothly animate playhead position toward target (LERP)
+        speed = 0.33
+        self.playhead_anim += (self.playhead_anim_target - self.playhead_anim) * speed
+        if abs(self.playhead_anim - self.playhead_anim_target) < 0.01:
+            self.playhead_anim = self.playhead_anim_target
         self.update()
     def get_active_blocks(self, step_idx):
         # Return all blocks active at this step
@@ -1248,14 +1367,8 @@ class MainWindow(QWidget):
         self.tempo = 100
         self.key = "C"
         self.mode = "Major (Ionian)"
-
-        import threading
-        import time
-        import numpy as np
-        import sounddevice as sd
-
-        # Add a lock to prevent concurrent audio playback
-        self.audio_lock = threading.Lock()
+        self.synth = SustainedSynth()
+        self.playback_thread = None
 
         def play_chord_tone(self, notes, duration=0.5, fs=44100):
             print(f"[DEBUG] play_chord_tone called with notes: {notes}")
@@ -1272,113 +1385,82 @@ class MainWindow(QWidget):
                 return
             audio = audio / np.max(np.abs(audio))
             print("[DEBUG] Playing audio buffer with sounddevice.")
-            # Ensure only one playback at a time
-            with self.audio_lock:
-                sd.play(audio, fs)
-                sd.wait()
+            sd.play(audio, fs)
+            sd.wait()
         setattr(MainWindow, "play_chord_tone", play_chord_tone)
 
         def on_play():
+            if self.is_playing:
+                on_stop()
+                time.sleep(0.1)  # Ensure cleanup
             self.is_playing = True
+            self.synth.start()
             print("Playback started at", self.tempo, "BPM")
             from PyQt5.QtCore import QTimer
-            import time
-            import numpy as np
-            import sounddevice as sd
 
-            # Get pattern info
             pattern_panel = getattr(self, "pattern_panel", None)
-            if pattern_panel:
-                quant = getattr(pattern_panel, "quantization", "Sixteenth")
-                pattern_bars = getattr(pattern_panel, "pattern_bars", 1)
-                # Number of steps in the pattern
-                if quant == "Whole":
-                    pattern_length = pattern_bars * 1
-                elif quant == "Half":
-                    pattern_length = pattern_bars * 2
-                elif quant == "Quarter":
-                    pattern_length = pattern_bars * 4
-                elif quant == "Eighth":
-                    pattern_length = pattern_bars * 8
-                elif quant == "Sixteenth":
-                    pattern_length = pattern_bars * 16
-                else:
-                    pattern_length = pattern_bars * 16
-            else:
-                pattern_length = 16
-                quant = "Sixteenth"
-
-            # Calculate step duration based on quantization and tempo
+            pattern_length = 32  # Always 32 steps
             bpm = self.tempo
-            if quant == "Whole":
-                step_duration = 4 * 60 / bpm
-            elif quant == "Half":
-                step_duration = 2 * 60 / bpm
-            elif quant == "Quarter":
-                step_duration = 60 / bpm
-            elif quant == "Eighth":
-                step_duration = 60 / bpm / 2
-            elif quant == "Sixteenth":
-                step_duration = 60 / bpm / 4
-            else:
-                step_duration = 60 / bpm / 4
-
-            # Reduce playback duration to 85% of step duration to avoid overlap
-            note_play_duration = step_duration * 0.88
-            fs = 44100
+            step_duration = 60 / bpm / 4  # Sixteenth notes
 
             def play_loop():
-                print(f"[DEBUG] pattern_length: {pattern_length}, quant: {quant}, step_duration: {step_duration}")
                 for step_idx in range(pattern_length):
                     if not self.is_playing:
                         break
-                    # Highlight current step in pattern panel
+                    # Highlight current step
                     if pattern_panel:
                         QTimer.singleShot(0, partial(pattern_panel.highlight_step, step_idx))
-                    # Play all active blocks at this step (polyphony)
-                    if pattern_panel:
-                        active_blocks = pattern_panel.get_active_blocks(step_idx)
-                        freqs = []
-                        for block in active_blocks:
-                            chord_idx = block["chord_idx"]
-                            if 0 <= chord_idx < len(self.chord_progression):
-                                chord = self.chord_progression[chord_idx]
-                                block_freqs = self.get_chord_frequencies(
-                                    chord["roman"],
-                                    chord.get("extension"),
-                                    chord.get("inversion"),
-                                    chord.get("voicing"),
-                                    key=self.key,
-                                    mode=self.mode
-                                )
-                                freqs.extend(block_freqs)
-                        # Remove duplicates for polyphony, but allow all notes
-                        if freqs:
-                            # Sum sine waves for all frequencies, play together
-                            t = np.linspace(0, note_play_duration, int(fs * note_play_duration), False)
-                            audio = np.zeros_like(t)
-                            for freq in freqs:
-                                audio += 0.3 * np.sin(2 * np.pi * freq * t)
-                            # Normalize
-                            if np.max(np.abs(audio)) > 0:
-                                audio = audio / np.max(np.abs(audio))
-                                with self.audio_lock:
-                                    sd.play(audio, fs)
-                                    sd.wait()
+                    # Find all block starts and ends at this step
+                    blocks = pattern_panel.blocks if pattern_panel else []
+                    blocks_starting = [block for block in blocks if block["start"] == step_idx]
+                    blocks_ending = [block for block in blocks if block["start"] + block["length"] == step_idx]
+                    # Note on for starting blocks
+                    for block in blocks_starting:
+                        chord_idx = block["chord_idx"]
+                        if 0 <= chord_idx < len(self.chord_progression):
+                            chord = self.chord_progression[chord_idx]
+                            freqs = self.get_chord_frequencies(
+                                chord["roman"],
+                                chord.get("extension"),
+                                chord.get("inversion"),
+                                chord.get("voicing"),
+                                key=self.key,
+                                mode=self.mode
+                            )
+                            self.synth.note_on(freqs)
+                    # Note off for ending blocks
+                    for block in blocks_ending:
+                        chord_idx = block["chord_idx"]
+                        if 0 <= chord_idx < len(self.chord_progression):
+                            chord = self.chord_progression[chord_idx]
+                            freqs = self.get_chord_frequencies(
+                                chord["roman"],
+                                chord.get("extension"),
+                                chord.get("inversion"),
+                                chord.get("voicing"),
+                                key=self.key,
+                                mode=self.mode
+                            )
+                            self.synth.note_off(freqs)
                     time.sleep(step_duration)
-                # Clear highlight at end
+                # Clear highlight at end and all notes off
                 if pattern_panel:
                     QTimer.singleShot(0, partial(pattern_panel.highlight_step, -1))
+                self.synth.all_notes_off()
                 self.is_playing = False
-            threading.Thread(target=play_loop, daemon=True).start()
+
+            self.playback_thread = threading.Thread(target=play_loop, daemon=True)
+            self.playback_thread.start()
 
         def on_stop():
             self.is_playing = False
+            if self.playback_thread is not None and self.playback_thread.is_alive():
+                self.playback_thread.join(timeout=1.0)
+                self.playback_thread = None
             self.structure_panel.highlight_card(-1)
-            # Clear pattern highlight
             if hasattr(self, "pattern_panel"):
                 self.pattern_panel.highlight_step(-1)
-            print("Playback stopped")
+            self.synth.stop()
 
         def set_tempo(val):
             self.tempo = val
