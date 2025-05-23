@@ -937,6 +937,35 @@ class SettingsPanel(QWidget):
         layout.addLayout(button_row)
         layout.addWidget(self.export_btn)
 
+        from PyQt5.QtWidgets import QCheckBox
+
+        self.click_checkbox = QCheckBox("Enable Click Track")
+        self.click_checkbox.setChecked(False)
+        self.click_checkbox.setStyleSheet("font-size: 16px; margin-left: 12px;")
+        layout.addWidget(self.click_checkbox)
+
+        def on_click_checkbox_changed(state):
+            parent = self.parentWidget()
+            while parent and not hasattr(parent, "click_enabled"):
+                parent = parent.parentWidget()
+            if parent:
+                parent.click_enabled = (state == Qt.Checked)
+        self.click_checkbox.stateChanged.connect(on_click_checkbox_changed)
+
+        # Add loop playback checkbox
+        self.loop_checkbox = QCheckBox("Loop Playback")
+        self.loop_checkbox.setChecked(False)
+        self.loop_checkbox.setStyleSheet("font-size: 16px; margin-left: 12px;")
+        layout.addWidget(self.loop_checkbox)
+
+        def on_loop_checkbox_changed(state):
+            parent = self.parentWidget()
+            while parent and not hasattr(parent, "loop_enabled"):
+                parent = parent.parentWidget()
+            if parent:
+                parent.loop_enabled = (state == Qt.Checked)
+        self.loop_checkbox.stateChanged.connect(on_loop_checkbox_changed)
+
         # Key row
         key_label = QLabel("Key:")
         key_label.setStyleSheet("font-family: Palatino, Georgia, serif; font-size: 16pt; font-weight: bold;")
@@ -1369,6 +1398,8 @@ class MainWindow(QWidget):
         self.mode = "Major (Ionian)"
         self.synth = SustainedSynth()
         self.playback_thread = None
+        self.click_enabled = False
+        self.loop_enabled = False
 
         def play_chord_tone(self, notes, duration=0.5, fs=44100):
             print(f"[DEBUG] play_chord_tone called with notes: {notes}")
@@ -1404,17 +1435,25 @@ class MainWindow(QWidget):
             step_duration = 60 / bpm / 4  # Sixteenth notes
 
             def play_loop():
-                for step_idx in range(pattern_length):
-                    if not self.is_playing:
-                        break
-                    # Highlight current step
+                step_idx = 0
+                while self.is_playing:
                     if pattern_panel:
                         QTimer.singleShot(0, partial(pattern_panel.highlight_step, step_idx))
-                    # Find all block starts and ends at this step
+
+                    if self.click_enabled:
+                        fs = 44100
+                        duration = 0.05
+                        freq = 1760 if step_idx % 16 == 0 else 1200
+                        t = np.linspace(0, duration, int(fs * duration), False)
+                        click = 0.5 * np.sin(2 * np.pi * freq * t)
+                        fade = np.linspace(1, 0, int(fs * duration))
+                        click = click * fade
+                        sd.play(click, fs, blocking=False)
+
                     blocks = pattern_panel.blocks if pattern_panel else []
-                    blocks_starting = [block for block in blocks if block["start"] == step_idx]
-                    blocks_ending = [block for block in blocks if block["start"] + block["length"] == step_idx]
-                    # Note on for starting blocks
+                    blocks_starting = [b for b in blocks if b["start"] == step_idx]
+                    blocks_ending = [b for b in blocks if b["start"] + b["length"] == step_idx]
+
                     for block in blocks_starting:
                         chord_idx = block["chord_idx"]
                         if 0 <= chord_idx < len(self.chord_progression):
@@ -1428,7 +1467,7 @@ class MainWindow(QWidget):
                                 mode=self.mode
                             )
                             self.synth.note_on(freqs)
-                    # Note off for ending blocks
+
                     for block in blocks_ending:
                         chord_idx = block["chord_idx"]
                         if 0 <= chord_idx < len(self.chord_progression):
@@ -1442,8 +1481,15 @@ class MainWindow(QWidget):
                                 mode=self.mode
                             )
                             self.synth.note_off(freqs)
+
                     time.sleep(step_duration)
-                # Clear highlight at end and all notes off
+                    step_idx += 1
+                    if step_idx >= pattern_length:
+                        if self.loop_enabled:
+                            step_idx = 0
+                        else:
+                            break
+
                 if pattern_panel:
                     QTimer.singleShot(0, partial(pattern_panel.highlight_step, -1))
                 self.synth.all_notes_off()
