@@ -136,7 +136,7 @@ class ChordPanel(QWidget):
 
         # layout inside the card
         card_layout = QVBoxLayout(card_frame)
-        card_layout.setAlignment(Qt.AlignVCenter | Qt.AlignHCenter)
+        card_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
         card_layout.setSpacing(0)
         card_layout.setContentsMargins(16, 16, 16, 16)
 
@@ -146,8 +146,9 @@ class ChordPanel(QWidget):
         header.setStyleSheet(
             "font-family: Palatino, Georgia, serif;"
             "font-weight: bold;"
-            "font-size: 24pt;"
-            "margin: 16px 0 0 0;"
+            "font-size: 28pt;"
+            "margin-top: 0px;"
+            "margin-bottom: 12px;"
             "color: #222;"
         )
 
@@ -157,19 +158,18 @@ class ChordPanel(QWidget):
         # make it exactly as wide as the panel minus margins (16px each side)
         wheel.setFixedSize(PANEL_W - 32, PANEL_W - 32)
 
-        # Create a container widget for header + wheel for easier centering
+        # Create a container widget for wheel only (no header)
         wheel_group = QWidget(card_frame)
         wheel_group_layout = QVBoxLayout(wheel_group)
         wheel_group_layout.setContentsMargins(0, 0, 0, 0)
         wheel_group_layout.setSpacing(8)
         wheel_group_layout.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-        wheel_group_layout.addWidget(header, alignment=Qt.AlignHCenter)
+        # Only the wheel in the group (header will be placed outside)
         wheel_group_layout.addWidget(wheel, alignment=Qt.AlignHCenter)
 
-        # Add stretch above and below to center the wheel group in the panel
-        card_layout.addStretch(1)
+        # Place header at the top of the card (outside wheel_group)
+        card_layout.addWidget(header, alignment=Qt.AlignTop | Qt.AlignHCenter)
         card_layout.addWidget(wheel_group, alignment=Qt.AlignHCenter | Qt.AlignVCenter)
-        card_layout.addStretch(1)
         self.roman_numerals = ["I", "ii", "iii", "IV", "V", "vi", "vii°"]
         self.btns = []
         degree_colors = {
@@ -227,10 +227,10 @@ class ChordPanel(QWidget):
         # Central "ADD CHORD" button in the wheel
         add_chord_center = QPushButton("ADD\nCHORD", wheel)
         add_chord_center.setFixedSize(130, 130)
-        # Center the button exactly in the wheel
+        # Center the button exactly in the wheel, with a small nudge for visual centering
         add_chord_center.move(
-            (wheel.width() - add_chord_center.width()) // 2,
-            (wheel.height() - add_chord_center.height()) // 2
+            (wheel.width() - add_chord_center.width()) // 2 + 1,
+            (wheel.height() - add_chord_center.height()) // 2 + 2
         )
         font_center = QFont("Palatino")
         if not font_center.exactMatch():
@@ -329,21 +329,31 @@ class StructurePanel(QWidget):
         card_frame.setMinimumHeight(PANEL_H)
         card_frame.setMaximumHeight(PANEL_H)
         card_frame.setStyleSheet(PANEL_STYLE)
+        # Standardize panel height to match others
+        self.setMinimumHeight(PANEL_H)
+        self.setMaximumHeight(PANEL_H)
         card_layout = QVBoxLayout(card_frame)
         card_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
-        card_layout.setSpacing(24)
-        card_layout.setContentsMargins(16, 16, 16, 16)
+        card_layout.setSpacing(12)
+        card_layout.setContentsMargins(12, 12, 12, 12)
 
         # Header
         header = QLabel("Chord Structure")
         header.setAlignment(Qt.AlignCenter)
-        header.setStyleSheet("font-family: Palatino, Georgia, serif; font-weight: bold; font-size: 28pt; margin: 24px 0 12px 0; color: #222;")
-        card_layout.addWidget(header)
+        header.setStyleSheet(
+            "font-family: Palatino, Georgia, serif;"
+            "font-weight: bold;"
+            "font-size: 28pt;"
+            "margin-top: 0px;"
+            "margin-bottom: 12px;"
+            "color: #222;"
+        )
+        card_layout.addWidget(header, alignment=Qt.AlignTop | Qt.AlignHCenter)
 
         # Chord slots and instructional text
         from PyQt5.QtWidgets import QPushButton
         self.cards_layout = QVBoxLayout()
-        self.cards_layout.setSpacing(12)
+        self.cards_layout.setSpacing(3)
 
         # Add Remove All and Randomize buttons
         controls_row = QHBoxLayout()
@@ -382,14 +392,32 @@ class StructurePanel(QWidget):
         self.update_chords(chords)
 
     def update_chords(self, chords):
-        # Remove old cards
+        from PyQt5.QtWidgets import QFrame
+        chords = chords[:8]  # Limit to 8 chords max
+        # Reserve space for up to 8 cards, matching panel height
+        self.setFixedHeight(PANEL_H)
+        # Remove old cards/layouts
         self.card_widgets = []
         while self.cards_layout.count():
             item = self.cards_layout.takeAt(0)
             widget = item.widget()
             if widget:
                 widget.deleteLater()
+            else:
+                # If item is a layout, delete all its widgets/layouts recursively
+                sublayout = item.layout() if hasattr(item, "layout") else None
+                if sublayout:
+                    while sublayout.count():
+                        subitem = sublayout.takeAt(0)
+                        subwidget = subitem.widget()
+                        if subwidget:
+                            subwidget.deleteLater()
         if not chords:
+            # Centered instructional text
+            empty = QLabel("Construct your chord progression here.")
+            empty.setAlignment(Qt.AlignCenter)
+            empty.setStyleSheet("color: #bbb; font-family: Palatino, Georgia, serif; font-size: 13pt; margin-top: 18px;")
+            self.cards_layout.addWidget(empty)
             # Show 4 empty outlined boxes, centered
             from PyQt5.QtWidgets import QHBoxLayout
             slot_row = QHBoxLayout()
@@ -397,7 +425,7 @@ class StructurePanel(QWidget):
             slot_row.setAlignment(Qt.AlignHCenter)
             for _ in range(4):
                 slot = QFrame()
-                slot.setFixedSize(56, 56)
+                slot.setFixedSize(48, 48)
                 slot.setStyleSheet(
                     "background: #fff; border: 2.5px solid #bbb; border-radius: 10px;"
                 )
@@ -405,204 +433,254 @@ class StructurePanel(QWidget):
                 slot.setToolTip("Empty chord slot (Tab to focus)")
                 slot_row.addWidget(slot)
             self.cards_layout.addLayout(slot_row)
-            # Centered instructional text
-            empty = QLabel("Construct your chord progression here.")
-            empty.setAlignment(Qt.AlignCenter)
-            empty.setStyleSheet("color: #bbb; font-family: Palatino, Georgia, serif; font-size: 13pt; margin-top: 18px;")
-            self.cards_layout.addWidget(empty)
         else:
-            # Show each chord as a styled card with play, label, modifiers, and delete
-            from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout
-            for i, chord in enumerate(chords):
-                roman = chord["roman"]
-                color = "#1976d2" if roman in ["I", "IV", "V"] else "#388e3c" if roman in ["ii", "iii", "vi"] else "#d32f2f"
-                card = QFrame()
-                card.setObjectName("chordCard")
-                card.setMinimumHeight(110)
-                card.setStyleSheet(
-                    f"""
-                    QFrame#chordCard {{
-                        border: 1.5px solid {color};
-                        border-radius: 16px;
-                        margin-bottom: 16px;
-                        background: #fff;
-                    }}
-                    """
-                )
-                # Add drop shadow effect
-                from PyQt5.QtWidgets import QGraphicsDropShadowEffect
-                shadow = QGraphicsDropShadowEffect(card)
-                shadow.setBlurRadius(16)
-                shadow.setOffset(0, 4)
-                shadow.setColor(Qt.gray)
-                card.setGraphicsEffect(shadow)
-                card.setFocusPolicy(Qt.StrongFocus)
-                card.setToolTip(f"Chord: {roman} (hover to preview, drag to reorder)")
-                card_layout = QHBoxLayout()
-                card_layout.setSpacing(10)
-                card_layout.setContentsMargins(12, 8, 12, 8)
-                # Play button
-                from PyQt5.QtGui import QIcon, QPixmap, QPainter, QBrush, QPolygon
-                from PyQt5.QtCore import QPoint
+            # Always reserve 8 vertical slots, never overlap
+            from PyQt5.QtWidgets import QVBoxLayout, QFrame
+            for i in range(8):
+                slot_container = QVBoxLayout()
+                slot_container.setContentsMargins(0, 0, 0, 0)
+                slot_container.setSpacing(2)
+                if i < len(chords):
+                    card = self.create_card(chords[i], i)
+                    slot_container.addWidget(card)
+                    self.card_widgets.append(card)
+                else:
+                    spacer = QFrame()
+                    spacer.setFixedHeight(52)
+                    slot_container.addWidget(spacer)
+                self.cards_layout.addLayout(slot_container)
 
-                # Create a small play icon (white triangle)
-                small_play_pixmap = QPixmap(24, 24)
-                small_play_pixmap.fill(Qt.transparent)
-                painter = QPainter(small_play_pixmap)
-                painter.setRenderHint(QPainter.Antialiasing)
-                painter.setBrush(QBrush(Qt.white))
-                painter.setPen(Qt.NoPen)
-                triangle = QPolygon([QPoint(7, 4), QPoint(19, 12), QPoint(7, 20)])
-                painter.drawPolygon(triangle)
-                painter.end()
-                small_play_icon = QIcon(small_play_pixmap)
+    def create_card(self, chord, idx):
+        from PyQt5.QtWidgets import QFrame, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, QWidget, QSpacerItem, QSizePolicy
+        from PyQt5.QtGui import QFont, QIcon, QPixmap, QPainter, QBrush, QPolygon
+        from PyQt5.QtCore import Qt, QPoint
+        roman = chord["roman"]
+        color = "#1976d2" if roman in ["I", "IV", "V"] else "#388e3c" if roman in ["ii", "iii", "vi"] else "#d32f2f"
+        card = QFrame()
+        card.setObjectName("chordCard")
+        card.setFixedHeight(52)
+        card.setStyleSheet(
+            f"""
+            QFrame#chordCard {{
+                border: 1.5px solid {color};
+                border-radius: 16px;
+                margin-bottom: 8px;
+                background: #fff;
+            }}
+            """
+        )
+        from PyQt5.QtWidgets import QGraphicsDropShadowEffect
+        shadow = QGraphicsDropShadowEffect(card)
+        shadow.setBlurRadius(16)
+        shadow.setOffset(0, 4)
+        shadow.setColor(Qt.gray)
+        card.setGraphicsEffect(shadow)
+        card.setFocusPolicy(Qt.StrongFocus)
+        card.setToolTip(f"Chord: {roman} (hover to preview, drag to reorder)")
+        card_layout = QHBoxLayout()
+        # Consistent margins and spacing for card layout
+        card_layout.setContentsMargins(8, 6, 8, 6)
+        card_layout.setSpacing(6)
+        card_layout.setAlignment(Qt.AlignVCenter)
 
-                play_btn = QPushButton(card)
-                play_btn.setIcon(small_play_icon)
-                play_btn.setIconSize(small_play_pixmap.size())
-                play_btn.setFixedSize(36, 36)
-                play_btn.setStyleSheet(
-                    """
-                    QPushButton {
-                        background: #1976d2;
-                        border-radius: 10px;
-                        border: none;
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.10);
-                    }
-                    QPushButton:pressed {
-                        background: #1565c0;
-                    }
-                    """
-                )
-                play_btn.setFocusPolicy(Qt.StrongFocus)
-                play_btn.setToolTip("Preview this chord")
-                def make_play(idx):
-                    def play():
-                        parent = self.parentWidget()
-                        while parent and not hasattr(parent, "key"):
-                            parent = parent.parentWidget()
-                        if parent and hasattr(parent, "key"):
-                            chord = self.chords[idx]
-                            freqs = parent.get_chord_frequencies(
-                                chord["roman"],
-                                chord.get("extension"),
-                                chord.get("inversion"),
-                                chord.get("voicing"),
-                                key=parent.key,
-                                mode=parent.mode
-                            )
-                            parent.play_chord_tone(freqs, duration=0.5)
-                    return play
-                play_btn.clicked.connect(make_play(i))
-                card_layout.addWidget(play_btn)
-                # create a vertical stack for label + modifiers
-                label_column = QVBoxLayout()
-                label_column.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        # Uniform button/label size
+        btn_size = 28
 
-                # Roman numeral label
-                label = QLabel(roman, card)
-                label.setAlignment(Qt.AlignCenter)
-                font = QFont("Palatino")
-                if not font.exactMatch():
-                    font = QFont("Georgia")
-                font.setPointSize(32)
-                font.setWeight(QFont.Bold)
-                label.setFont(font)
-                label.setStyleSheet(f"font-size: 32px; font-weight: bold; color: {color}; min-width: 60px;")
-                label.setWordWrap(False)  # Prevent text wrapping
-                label.setMinimumHeight(40)  # Ensure consistent height
-                label.setAlignment(Qt.AlignCenter)  # Center-align text
-                label_column.addWidget(label)
+        # Helper to strictly vertically & horizontally center a widget
+        def center_wrap(widget):
+            container = QWidget()
+            layout = QVBoxLayout(container)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setAlignment(Qt.AlignCenter)
+            layout.addWidget(widget)
+            return container
 
-                # modifiers in a single horizontal row
-                mod_row = QHBoxLayout()
-                mod_row.setSpacing(8)
-                mod_row.setAlignment(Qt.AlignLeft | Qt.AlignBottom)
+        # Play button (uniform size)
+        small_play_pixmap = QPixmap(24, 24)
+        small_play_pixmap.fill(Qt.transparent)
+        painter = QPainter(small_play_pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setBrush(QBrush(Qt.white))
+        painter.setPen(Qt.NoPen)
+        triangle = QPolygon([QPoint(7, 4), QPoint(19, 12), QPoint(7, 20)])
+        painter.drawPolygon(triangle)
+        painter.end()
+        small_play_icon = QIcon(small_play_pixmap)
 
-                if chord.get("extension"):
-                    ext_pill = QLabel(chord["extension"])
-                    ext_pill.setFixedHeight(30)
-                    ext_pill.setMinimumWidth(56)
-                    ext_pill.setAlignment(Qt.AlignCenter)
-                    ext_pill.setStyleSheet(
-                        f"""
-                        background: #fff;
-                        color: {color};
-                        border: 2px solid {color};
-                        border-radius: 8px;
-                        font-size: 14px;
-                        font-weight: bold;
-                        padding: 4px 10px;
-                        """
+        play_btn = QPushButton(card)
+        play_btn.setIcon(small_play_icon)
+        play_btn.setIconSize(small_play_pixmap.size())
+        play_btn.setFixedSize(btn_size, btn_size)
+        play_btn.setStyleSheet(
+            """
+            QPushButton {
+                background: #1976d2;
+                border-radius: 8px;
+                border: none;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+            }
+            QPushButton:pressed {
+                background: #1565c0;
+            }
+            """
+        )
+        play_btn.setFocusPolicy(Qt.StrongFocus)
+        play_btn.setToolTip("Preview this chord")
+        def make_play(idx):
+            def play():
+                parent = self.parentWidget()
+                while parent and not hasattr(parent, "key"):
+                    parent = parent.parentWidget()
+                if parent and hasattr(parent, "key"):
+                    chord = self.chords[idx]
+                    freqs = parent.get_chord_frequencies(
+                        chord["roman"],
+                        chord.get("extension"),
+                        chord.get("inversion"),
+                        chord.get("voicing"),
+                        key=parent.key,
+                        mode=parent.mode
                     )
-                    mod_row.addWidget(ext_pill)
+                    parent.play_chord_tone(freqs, duration=0.5)
+            return play
+        play_btn.clicked.connect(make_play(idx))
+        play_btn_container = center_wrap(play_btn)
+        play_btn_container.layout().setAlignment(Qt.AlignCenter)
+        card_layout.addWidget(play_btn_container)
 
-                if chord.get("inversion"):
-                    inv_pill = QLabel(chord["inversion"])
-                    inv_pill.setFixedHeight(30)
-                    inv_pill.setMinimumWidth(56)
-                    inv_pill.setAlignment(Qt.AlignCenter)
-                    inv_pill.setStyleSheet(
-                        f"""
-                        background: #fff;
-                        color: {color};
-                        border: 2px solid {color};
-                        border-radius: 8px;
-                        font-size: 14px;
-                        font-weight: bold;
-                        padding: 4px 10px;
-                        """
-                    )
-                    mod_row.addWidget(inv_pill)
+        # Roman numeral label (uniform size to buttons)
+        label = QLabel(roman, card)
+        label.setAlignment(Qt.AlignCenter)
+        font = QFont("Palatino")
+        if not font.exactMatch():
+            font = QFont("Georgia")
+        font.setPointSize(14)
+        font.setWeight(QFont.Bold)
+        label.setFont(font)
+        label.setStyleSheet(f"""
+            font-size: 14px;
+            font-weight: bold;
+            color: {color};
+            border: 2px solid {color};
+            border-radius: 10px;
+            padding: 0px 0px;
+        """)
+        label.setWordWrap(False)
+        label.setFixedSize(btn_size, btn_size)
+        label.setAlignment(Qt.AlignCenter)
+        label_container = center_wrap(label)
+        # Remove any extra setContentsMargins offsets
+        label_container.setContentsMargins(0, 0, 0, 0)
+        label_container.layout().setAlignment(Qt.AlignCenter)
+        card_layout.addWidget(label_container)
 
-                if chord.get("voicing"):
-                    voicing_pill = QLabel(chord["voicing"])
-                    voicing_pill.setFixedHeight(30)
-                    voicing_pill.setMinimumWidth(56)
-                    voicing_pill.setAlignment(Qt.AlignCenter)
-                    voicing_pill.setStyleSheet(
-                        f"""
-                        background: #fff;
-                        color: {color};
-                        border: 2px solid {color};
-                        border-radius: 8px;
-                        font-size: 14px;
-                        font-weight: bold;
-                        padding: 4px 10px;
-                        """
-                    )
-                    mod_row.addWidget(voicing_pill)
+        # Add spacing between Roman numeral and modifier row
+        card_layout.addSpacing(6)
 
-                label_column.addLayout(mod_row)
-                card_layout.addLayout(label_column, 1)
+        # Modifier row (modifiers, centered vertically, with spacers on both sides)
+        mod_row = QHBoxLayout()
+        mod_row.setSpacing(8)
+        mod_row.setContentsMargins(0, 0, 0, 0)
+        mod_row.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        # Left spacer
+        mod_row.addItem(QSpacerItem(4, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        if chord.get("extension"):
+            ext_pill = QLabel(chord["extension"])
+            ext_pill.setFixedHeight(22)
+            ext_pill.setMinimumHeight(22)
+            ext_pill.setMinimumWidth(44)
+            ext_pill.setAlignment(Qt.AlignCenter)
+            ext_pill.setStyleSheet(
+                f"""
+                background: #fff;
+                color: {color};
+                border: 2px solid {color};
+                border-radius: 8px;
+                font-size: 13px;
+                font-weight: bold;
+                padding: 0px 6px;
+                """
+            )
+            mod_row.addWidget(center_wrap(ext_pill))
+        if chord.get("inversion"):
+            inv_pill = QLabel(chord["inversion"])
+            inv_pill.setFixedHeight(22)
+            inv_pill.setMinimumHeight(22)
+            inv_pill.setMinimumWidth(44)
+            inv_pill.setAlignment(Qt.AlignCenter)
+            inv_pill.setStyleSheet(
+                f"""
+                background: #fff;
+                color: {color};
+                border: 2px solid {color};
+                border-radius: 8px;
+                font-size: 13px;
+                font-weight: bold;
+                padding: 0px 6px;
+                """
+            )
+            mod_row.addWidget(center_wrap(inv_pill))
+        if chord.get("voicing"):
+            voicing_pill = QLabel(chord["voicing"])
+            voicing_pill.setFixedHeight(22)
+            voicing_pill.setMinimumHeight(22)
+            voicing_pill.setMinimumWidth(44)
+            voicing_pill.setAlignment(Qt.AlignCenter)
+            voicing_pill.setStyleSheet(
+                f"""
+                background: #fff;
+                color: {color};
+                border: 2px solid {color};
+                border-radius: 8px;
+                font-size: 13px;
+                font-weight: bold;
+                padding: 0px 6px;
+                """
+            )
+            mod_row.addWidget(center_wrap(voicing_pill))
+        # Right spacer
+        mod_row.addItem(QSpacerItem(4, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        # Wrap mod_row in a QWidget for vertical centering
+        mod_row_container = QWidget()
+        mod_row_container.setLayout(mod_row)
+        mod_row.layout().setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        card_layout.addWidget(mod_row_container)
 
-                # Edit/settings button (distinct)
-                edit_btn = QPushButton("✎", card)
-                edit_btn.setFixedSize(36, 36)
-                edit_btn.setStyleSheet(
-                    "QPushButton {background: #fff; color: #1976d2; border: 2px solid #1976d2; font-size: 22px; font-weight: bold; border-radius: 10px;}"
-                    "QPushButton:focus { box-shadow: 0 0 0 2px #1976d244; }"
-                    "QPushButton:hover { background: #e3f2fd; }"
-                )
-                edit_btn.setFocusPolicy(Qt.StrongFocus)
-                edit_btn.setToolTip("Edit this chord")
-                edit_btn.clicked.connect(lambda checked, idx=i: self.show_modifier_popup(idx))
-                card_layout.addWidget(edit_btn)
-                # Delete button
-                del_btn = QPushButton("✕", card)
-                del_btn.setFixedSize(36, 36)
-                del_btn.setStyleSheet(
-                    "QPushButton {background: #fff; color: #888; border: none; font-size: 24px; font-weight: bold; border-radius: 10px;}"
-                    "QPushButton:focus { box-shadow: 0 0 0 2px #8884; }"
-                    "QPushButton:hover { background: #f0f0f0; }"
-                )
-                del_btn.setFocusPolicy(Qt.StrongFocus)
-                del_btn.setToolTip("Remove this chord from progression")
-                del_btn.clicked.connect(lambda checked, idx=i: self.on_delete(idx))
-                card_layout.addWidget(del_btn)
-                card.setLayout(card_layout)
-                self.cards_layout.addWidget(card)
-                self.card_widgets.append(card)
+        # Edit/settings button (uniform size)
+        edit_btn = QPushButton("✎", card)
+        edit_btn.setFixedSize(btn_size, btn_size)
+        edit_btn.setStyleSheet(
+            "QPushButton {background: #fff; color: #1976d2; border: 2px solid #1976d2; font-size: 22px; font-weight: bold; border-radius: 8px;}"
+            "QPushButton:focus { box-shadow: 0 0 0 2px #1976d244; }"
+            "QPushButton:hover { background: #e3f2fd; }"
+        )
+        edit_btn.setFocusPolicy(Qt.StrongFocus)
+        edit_btn.setToolTip("Edit this chord")
+        edit_btn.clicked.connect(lambda checked, idx=idx: self.show_modifier_popup(idx))
+        edit_btn_container = center_wrap(edit_btn)
+        edit_btn_container.layout().setAlignment(Qt.AlignCenter)
+        card_layout.addWidget(edit_btn_container)
+
+        # Delete button (uniform size)
+        del_btn = QPushButton("✕", card)
+        del_btn.setFixedSize(btn_size, btn_size)
+        del_btn.setStyleSheet(
+            "QPushButton {background: #fff; color: #888; border: none; font-size: 24px; font-weight: bold; border-radius: 8px;}"
+            "QPushButton:focus { box-shadow: 0 0 0 2px #8884; }"
+            "QPushButton:hover { background: #f0f0f0; }"
+        )
+        del_btn.setFocusPolicy(Qt.StrongFocus)
+        del_btn.setToolTip("Remove this chord from progression")
+        del_btn.clicked.connect(lambda checked, idx=idx: self.on_delete(idx))
+        del_btn_container = center_wrap(del_btn)
+        del_btn_container.layout().setAlignment(Qt.AlignCenter)
+        card_layout.addWidget(del_btn_container)
+
+        # Ensure all widgets are vertically centered in the card
+        card_layout.setAlignment(Qt.AlignVCenter)
+
+        card.setLayout(card_layout)
+        return card
 
     def highlight_card(self, idx):
         for i, card in enumerate(getattr(self, "card_widgets", [])):
@@ -817,14 +895,21 @@ class SettingsPanel(QWidget):
         card_frame.setStyleSheet(PANEL_STYLE)
         layout = QVBoxLayout(card_frame)
         layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
-        layout.setSpacing(24)
+        layout.setSpacing(16)
         layout.setContentsMargins(16, 16, 16, 16)
 
         # Header
         header = QLabel("Session Settings")
         header.setAlignment(Qt.AlignCenter)
-        header.setStyleSheet("font-family: Palatino, Georgia, serif; font-weight: bold; font-size: 28pt; margin: 32px 0 16px 0; color: #222;")
-        layout.addWidget(header)
+        header.setStyleSheet(
+            "font-family: Palatino, Georgia, serif;"
+            "font-weight: bold;"
+            "font-size: 28pt;"
+            "margin-top: 16px;"
+            "margin-bottom: 24px;"
+            "color: #222;"
+        )
+        layout.addWidget(header, alignment=Qt.AlignTop | Qt.AlignHCenter)
 
         # Form layout for settings
         form = QFormLayout()
@@ -835,28 +920,47 @@ class SettingsPanel(QWidget):
         # (Bars and quantization controls removed)
 
 
+        # Standard label width for alignment
+        label_width = 60
+
         # Tempo row
         tempo_label = QLabel("Tempo:")
-        tempo_label.setStyleSheet("font-family: Palatino, Georgia, serif; font-size: 16pt; font-weight: bold;")
+        tempo_label.setStyleSheet(
+            "font-family: Palatino, Georgia, serif;"
+            "font-size: 18px;"
+            "font-weight: 600;"
+            "color: #222;"
+        )
+        tempo_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        tempo_label.setFixedWidth(label_width)
+
         self.tempo_spin = QSpinBox()
         self.tempo_spin.setRange(40, 240)
         self.tempo_spin.setValue(tempo)
-        self.tempo_spin.setFixedWidth(90)
-        self.tempo_spin.setStyleSheet("font-size: 16pt; padding: 2px 8px; border-radius: 6px; border: 1.5px solid #bbb; background: #fff;")
+        self.tempo_spin.setStyleSheet(
+            "font-size: 16px;"
+            "font-family: Palatino, Georgia, serif;"
+            "padding: 4px 10px;"
+            "border-radius: 6px;"
+            "border: 1.5px solid #bbb;"
+            "background-color: #f5f5f5;"
+        )
         self.tempo_spin.setFocusPolicy(Qt.StrongFocus)
         self.tempo_spin.setToolTip("Set playback tempo (BPM)")
+        self.tempo_spin.setPrefix("")
+        self.tempo_spin.setSuffix(" BPM")
         self.tempo_spin.valueChanged.connect(set_tempo)
-        bpm_label = QLabel("BPM")
-        bpm_label.setStyleSheet("font-family: Palatino, Georgia, serif; font-size: 16pt; font-weight: bold;")
-
-        tempo_row = QWidget()
-        tempo_row_layout = QHBoxLayout(tempo_row)
-        tempo_row_layout.setContentsMargins(0, 0, 0, 0)
-        tempo_row_layout.setSpacing(12)
-        tempo_row_layout.addWidget(tempo_label)
-        tempo_row_layout.addWidget(self.tempo_spin)
-        tempo_row_layout.addWidget(bpm_label)
-        form.addRow(tempo_row)
+        # --- Uniform width for all input widgets ---
+        uniform_input_width = 180
+        self.tempo_spin.setFixedWidth(uniform_input_width)
+        # Align tempo_spin to right in a layout
+        from PyQt5.QtWidgets import QWidget, QHBoxLayout
+        tempo_container = QWidget()
+        tempo_layout = QHBoxLayout(tempo_container)
+        tempo_layout.setContentsMargins(0, 0, 0, 0)
+        tempo_layout.setAlignment(Qt.AlignRight)
+        tempo_layout.addWidget(self.tempo_spin)
+        form.addRow(tempo_label, tempo_container)
 
         # Play/Stop/Export MIDI buttons row
         from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor, QBrush, QPolygon
@@ -941,7 +1045,7 @@ class SettingsPanel(QWidget):
 
         self.click_checkbox = QCheckBox("Enable Click Track")
         self.click_checkbox.setChecked(False)
-        self.click_checkbox.setStyleSheet("font-size: 16px; margin-left: 12px;")
+        self.click_checkbox.setStyleSheet("font-size: 14pt; margin: 4px 0px 0px 12px; font-family: Palatino, Georgia, serif; background: transparent;")
         layout.addWidget(self.click_checkbox)
 
         def on_click_checkbox_changed(state):
@@ -955,7 +1059,7 @@ class SettingsPanel(QWidget):
         # Add loop playback checkbox
         self.loop_checkbox = QCheckBox("Loop Playback")
         self.loop_checkbox.setChecked(False)
-        self.loop_checkbox.setStyleSheet("font-size: 16px; margin-left: 12px;")
+        self.loop_checkbox.setStyleSheet("font-size: 14pt; margin: 4px 0px 0px 12px; font-family: Palatino, Georgia, serif; background: transparent;")
         layout.addWidget(self.loop_checkbox)
 
         def on_loop_checkbox_changed(state):
@@ -968,31 +1072,51 @@ class SettingsPanel(QWidget):
 
         # Key row
         key_label = QLabel("Key:")
-        key_label.setStyleSheet("font-family: Palatino, Georgia, serif; font-size: 16pt; font-weight: bold;")
+        key_label.setStyleSheet(
+            "font-family: Palatino, Georgia, serif;"
+            "font-size: 18px;"
+            "font-weight: 600;"
+            "color: #222;"
+        )
+        key_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        key_label.setFixedWidth(label_width)
+
         self.key_combo = QComboBox()
         self.key_toggle_btn = QPushButton("Sharp")
         self.key_toggle_btn.setCheckable(True)
         self.key_toggle_btn.setChecked(False)
         self.key_toggle_btn.setFixedWidth(60)
         self.key_toggle_btn.setStyleSheet(
-            "QPushButton {font-size: 14px; border-radius: 8px; background: #e0e0e0; color: #222; font-weight: bold;}"
-            "QPushButton:checked {background: #1976d2; color: #fff;}"
+            "QPushButton {"
+            "    font-size: 14px;"
+            "    border-radius: 6px;"
+            "    background: #e0e0e0;"
+            "    color: #333;"
+            "    font-weight: 600;"
+            "    padding: 4px 10px;"
+            "}"
+            "QPushButton:checked {"
+            "    background: #1976d2;"
+            "    color: #fff;"
+            "}"
         )
-        self.key_combo.setFixedWidth(90)
         self.key_combo.setStyleSheet(
-            "QComboBox {font-size: 16pt; border-radius: 8px; padding: 4px 16px; border: 1.5px solid #bbb; background: #fff;}"
-            "QComboBox:focus { border: 2px solid #1976d2; }"
-            "QAbstractItemView { background: #fff; }"
+            "font-size: 16px;"
+            "font-family: Palatino, Georgia, serif;"
+            "padding: 4px 10px;"
+            "border-radius: 6px;"
+            "border: 1.5px solid #bbb;"
+            "background-color: #f5f5f5;"
         )
         self.key_combo.setFocusPolicy(Qt.StrongFocus)
-        self.key_combo.setToolTip("Select key (Tab to focus, arrows to change)")
+        self.key_combo.setToolTip("Select key")
 
         self.key_options_sharps = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
         self.key_options_flats = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]
 
         def update_key_options():
             if self.key_toggle_btn.isChecked():
-                self.key_toggle_btn.setText("Flat")
+                self.key_toggle_btn.setText("♭")
                 self.key_combo.clear()
                 self.key_combo.addItems(self.key_options_flats)
                 if key in self.key_options_flats:
@@ -1000,7 +1124,7 @@ class SettingsPanel(QWidget):
                 else:
                     self.key_combo.setCurrentIndex(0)
             else:
-                self.key_toggle_btn.setText("Sharp")
+                self.key_toggle_btn.setText("#")
                 self.key_combo.clear()
                 self.key_combo.addItems(self.key_options_sharps)
                 if key in self.key_options_sharps:
@@ -1012,40 +1136,58 @@ class SettingsPanel(QWidget):
         self.key_combo.currentTextChanged.connect(set_key)
         update_key_options()
 
-        key_row = QWidget()
-        key_row_layout = QHBoxLayout(key_row)
+        # --- Uniform width for key_combo ---
+        self.key_combo.setFixedWidth(uniform_input_width)
+        key_widget = QWidget()
+        key_layout = QHBoxLayout(key_widget)
+        key_layout.setContentsMargins(0, 0, 0, 0)
+        key_layout.setSpacing(18)
+        # Add key_combo first, then key_toggle_btn (toggle button to the right)
+        key_layout.addWidget(self.key_combo)
+        key_layout.addWidget(self.key_toggle_btn)
+        # Wrap in a right-aligned layout
+        key_container = QWidget()
+        key_row_layout = QHBoxLayout(key_container)
         key_row_layout.setContentsMargins(0, 0, 0, 0)
-        key_row_layout.setSpacing(12)
-        key_row_layout.addWidget(key_label)
-        key_row_layout.addWidget(self.key_combo)
-        key_row_layout.addWidget(self.key_toggle_btn)
-        form.addRow(key_row)
+        key_row_layout.setAlignment(Qt.AlignRight)
+        key_row_layout.addWidget(key_widget)
+        form.addRow(key_label, key_container)
 
         # Mode row
         mode_label = QLabel("Mode:")
-        mode_label.setStyleSheet("font-family: Palatino, Georgia, serif; font-size: 16pt; font-weight: bold;")
+        mode_label.setStyleSheet(
+            "font-family: Palatino, Georgia, serif;"
+            "font-size: 18px;"
+            "font-weight: 600;"
+            "color: #222;"
+        )
+        mode_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        mode_label.setFixedWidth(label_width)
+
         self.mode_combo = QComboBox()
         self.mode_combo.addItems([m["label"] for m in MODES])
-        self.mode_combo.setFixedWidth(180)
-        self.mode_combo.setCurrentText(mode)
         self.mode_combo.setStyleSheet(
-            "QComboBox {font-size: 16pt; border-radius: 8px; padding: 4px 16px; border: 1.5px solid #bbb; background: #fff;}"
-            "QComboBox:focus { border: 2px solid #1976d2; }"
-            "QAbstractItemView { background: #fff; }"
+            "font-size: 16px;"
+            "font-family: Palatino, Georgia, serif;"
+            "padding: 4px 10px;"
+            "border-radius: 6px;"
+            "border: 1.5px solid #bbb;"
+            "background-color: #f5f5f5;"
         )
         self.mode_combo.setFocusPolicy(Qt.StrongFocus)
-        self.mode_combo.setToolTip("Select mode (Tab to focus, arrows to change)")
+        self.mode_combo.setToolTip("Select mode")
         self.mode_combo.currentTextChanged.connect(set_mode)
-
-        mode_row = QWidget()
-        mode_row_layout = QHBoxLayout(mode_row)
-        mode_row_layout.setContentsMargins(0, 0, 0, 0)
-        mode_row_layout.setSpacing(12)
-        mode_row_layout.addWidget(mode_label)
-        mode_row_layout.addWidget(self.mode_combo)
-        form.addRow(mode_row)
+        self.mode_combo.setFixedWidth(uniform_input_width)
+        # Align mode_combo to right in a layout
+        mode_container = QWidget()
+        mode_layout = QHBoxLayout(mode_container)
+        mode_layout.setContentsMargins(0, 0, 0, 0)
+        mode_layout.setAlignment(Qt.AlignRight)
+        mode_layout.addWidget(self.mode_combo)
+        form.addRow(mode_label, mode_container)
 
         layout.addLayout(form)
+        layout.addSpacing(12)
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.addWidget(card_frame)
@@ -1077,14 +1219,14 @@ class PatternEditorPanel(QWidget):
         self.drag_start = None
         self.resizing = False
         self.resize_dir = None
-        self.setMinimumHeight(180)
+        self.setMinimumHeight(320)
         self.setMouseTracking(True)
         self.colors = [
             "#1976d2", "#388e3c", "#d32f2f", "#fbc02d", "#7b1fa2", "#0288d1", "#c2185b"
         ]
         # Fixed grid: 32 steps, always integer step grid
         self.grid_steps = 32
-        self.grid_height = 40
+        self.grid_height = 30
         self.header_height = 30
         self.left_margin = 60
         self.right_margin = 20
@@ -1360,7 +1502,7 @@ class MainWindow(QWidget):
         self.setStyleSheet("background: #f5f5f5;")
         # Main 3-column layout with styled panels
         columns_layout = QHBoxLayout()
-        columns_layout.setSpacing(40)  # Equal spacing between panels
+        columns_layout.setSpacing(24)  # Reduced spacing between panels
         columns_layout.setContentsMargins(20, 20, 20, 20)  # Add margins around the layout
         columns_layout.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
 
