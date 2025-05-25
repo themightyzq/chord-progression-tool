@@ -166,7 +166,9 @@ class MainWindow(QWidget):
                     print(f"[DEBUG] Blocks starting at step {step_idx}: {blocks_starting}")
                     blocks_ending = [b for b in blocks if b["start"] + b["length"] == step_idx]
 
-                    for block in blocks_starting:
+                    # For each active block at this step, play arpeggiator note or chord
+                    active_blocks = [b for b in blocks if b["start"] <= step_idx < b["start"] + b["length"]]
+                    for block in active_blocks:
                         chord_idx = block["chord_idx"]
                         if 0 <= chord_idx < len(self.chord_progression):
                             chord = self.chord_progression[chord_idx]
@@ -178,30 +180,39 @@ class MainWindow(QWidget):
                                 key=self.key,
                                 mode=self.mode
                             )
-                            # --- Arpeggiator logic (looped for full block duration) ---
                             arp_mode = chord.get("arp_mode", "None")
                             arp_length = chord.get("arp_length", "1/16")
                             if arp_mode and arp_mode != "None":
+                                # Step-synchronized arpeggiator: sustain each note for the correct number of steps
                                 notes = self.get_chord_frequencies(
                                     chord["roman"], chord.get("extension"),
                                     chord.get("inversion"), chord.get("voicing"),
                                     self.key, self.mode
                                 )
                                 sequence = get_arpeggio_sequence(notes, arp_mode)
-                                duration_map = {"1/16": 0.125, "1/8": 0.25, "1/4": 0.5, "1/2": 1.0}
-                                note_duration = duration_map.get(arp_length, 0.125)
-                                total_duration = block["length"] * step_duration
-                                elapsed = 0.0
-                                while elapsed < total_duration and self.is_playing:
-                                    for note in sequence:
-                                        if elapsed >= total_duration or not self.is_playing:
-                                            break
-                                        self.synth.note_on([note])
-                                        time.sleep(note_duration)
-                                        self.synth.note_off([note])
-                                        elapsed += note_duration
+                                if not hasattr(self, "_arpeggio_positions"):
+                                    self._arpeggio_positions = {}
+                                if not hasattr(self, "_arpeggio_last_notes"):
+                                    self._arpeggio_last_notes = {}
+                                block_id = (block["start"], block["chord_idx"])
+                                step_offset = step_idx - block["start"]
+                                arp_length_map = {"1/16": 1, "1/8": 2, "1/4": 4, "1/2": 8}
+                                steps_per_arp_note = arp_length_map.get(arp_length, 1)
+                                # Only advance arpeggio note at the start of each arp note duration
+                                if step_offset % steps_per_arp_note == 0:
+                                    # Turn off previous note if any
+                                    last_note = self._arpeggio_last_notes.get(block_id)
+                                    if last_note is not None:
+                                        self.synth.note_off([last_note])
+                                    pos = self._arpeggio_positions.get(block_id, 0)
+                                    note = sequence[pos % len(sequence)]
+                                    self.synth.note_on([note])
+                                    self._arpeggio_positions[block_id] = pos + 1
+                                    self._arpeggio_last_notes[block_id] = note
                             else:
-                                self.synth.note_on(freqs)
+                                # Only play chord on the first step of the block
+                                if step_idx == block["start"]:
+                                    self.synth.note_on(freqs)
 
                     for block in blocks_ending:
                         chord_idx = block["chord_idx"]
@@ -215,18 +226,49 @@ class MainWindow(QWidget):
                                 key=self.key,
                                 mode=self.mode
                             )
-                            self.synth.note_off(freqs)
+                            arp_mode = chord.get("arp_mode", "None")
+                            if arp_mode and arp_mode != "None":
+                                # Step-synchronized arpeggiator: turn off last note and reset position for this block
+                                notes = self.get_chord_frequencies(
+                                    chord["roman"], chord.get("extension"),
+                                    chord.get("inversion"), chord.get("voicing"),
+                                    self.key, self.mode
+                                )
+                                sequence = get_arpeggio_sequence(notes, arp_mode)
+                                block_id = (block["start"], block["chord_idx"])
+                                if hasattr(self, "_arpeggio_last_notes"):
+                                    last_note = self._arpeggio_last_notes.get(block_id)
+                                    if last_note is not None:
+                                        self.synth.note_off([last_note])
+                                    self._arpeggio_last_notes.pop(block_id, None)
+                                if hasattr(self, "_arpeggio_positions"):
+                                    if block_id in self._arpeggio_positions:
+                                        del self._arpeggio_positions[block_id]
+                            else:
+                                self.synth.note_off(freqs)
 
                     time.sleep(step_duration)
                     step_idx += 1
                     if step_idx >= pattern_length:
                         if self.loop_enabled:
+                            # Wait for any running arpeggiator threads to finish before looping
+                            if hasattr(self, "_arpeggio_threads"):
+                                for t in self._arpeggio_threads:
+                                    t.join(timeout=2.0)
+                                self._arpeggio_threads.clear()
                             step_idx = 0
                         else:
                             break
 
                 if pattern_panel:
                     QTimer.singleShot(0, partial(pattern_panel.highlight_step, -1))
+                # Clear arpeggio positions and turn off any held arpeggiator notes at end of playback
+                if hasattr(self, "_arpeggio_last_notes"):
+                    for note in self._arpeggio_last_notes.values():
+                        self.synth.note_off([note])
+                    self._arpeggio_last_notes.clear()
+                if hasattr(self, "_arpeggio_positions"):
+                    self._arpeggio_positions.clear()
                 self.synth.all_notes_off()
                 self.is_playing = False
 
@@ -284,16 +326,24 @@ class MainWindow(QWidget):
                     notes = notes[1:] + notes[:1]
                 elif inversion == "2nd":
                     notes = notes[2:] + notes[:2]
-                if voicing == "Open" and len(notes) >= 3:
-                    notes = [notes[0], notes[1], notes[2]]
-                elif voicing == "Drop 2" and len(notes) >= 3:
-                    notes = [notes[0], notes[2], notes[1]]
+                # Convert note names to MIDI numbers
                 key_offset = note_map.get(key, 60) - 60
                 midi_notes = []
                 for n in notes:
                     base = n.replace("+8", "").replace("-8", "").replace("°", "")
                     midi = note_map.get(base, 60) + key_offset
                     midi_notes.append(midi)
+                # Apply voicing
+                if voicing == "Open" and len(midi_notes) >= 3:
+                    # Raise the 2nd note (by chord stack order) by an octave
+                    midi_notes = midi_notes[:]
+                    midi_notes[1] += 12
+                elif voicing == "Drop 2" and len(midi_notes) >= 3:
+                    # Lower the 2nd highest note by an octave
+                    midi_notes = midi_notes[:]
+                    sorted_idx = sorted(range(len(midi_notes)), key=lambda i: midi_notes[i], reverse=True)
+                    idx_2nd_highest = sorted_idx[1]
+                    midi_notes[idx_2nd_highest] -= 12
                 return midi_notes
 
             mid = mido.MidiFile()
@@ -509,13 +559,32 @@ class MainWindow(QWidget):
                 notes = notes[1:] + notes[:1]
             elif inversion == "2nd":
                 notes = notes[2:] + notes[:2]
-            if voicing == "Open" and len(notes) >= 3:
-                notes = [notes[0], notes[1], notes[2]]
-            elif voicing == "Drop 2" and len(notes) >= 3:
-                notes = [notes[0], notes[2], notes[1]]
-            # For "Custom" voicing, do nothing special (user-defined, not implemented)
-            # If "Custom" is selected, the voicing is not applied; user can implement their own logic here.
-            freqs = [note_map.get(n, 261.63) for n in notes]
+            # Convert note names to MIDI numbers (C4 = 60)
+            note_to_midi = {
+                "C": 60, "C#": 61, "Db": 61, "D": 62, "D#": 63, "Eb": 63, "E": 64, "F": 65, "F#": 66, "Gb": 66,
+                "G": 67, "G#": 68, "Ab": 68, "A": 69, "A#": 70, "Bb": 70, "B": 71
+            }
+            midi_notes = []
+            for n in notes:
+                base = n.replace("+8", "").replace("-8", "").replace("°", "")
+                midi = note_to_midi.get(base, 60)
+                # Handle octave shifts
+                if "+8" in n:
+                    midi += 12
+                if "-8" in n:
+                    midi -= 12
+                midi_notes.append(midi)
+            # Apply voicing
+            if voicing == "Open" and len(midi_notes) >= 3:
+                midi_notes = midi_notes[:]
+                midi_notes[1] += 12
+            elif voicing == "Drop 2" and len(midi_notes) >= 3:
+                midi_notes = midi_notes[:]
+                sorted_idx = sorted(range(len(midi_notes)), key=lambda i: midi_notes[i], reverse=True)
+                idx_2nd_highest = sorted_idx[1]
+                midi_notes[idx_2nd_highest] -= 12
+            # Convert MIDI numbers to frequencies
+            freqs = [440.0 * (2 ** ((m - 69) / 12.0)) for m in midi_notes]
             print(f"[DEBUG] Frequencies to play: {freqs}")
             print(f"[DEBUG] get_chord_frequencies returning: {freqs}")
             return freqs
