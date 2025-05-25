@@ -1,7 +1,17 @@
 cat > .gitignore <<EOF
+# ignore everything by default
 *
+
+# allow directories so git can recurse into them
+!*/
+
+# unignore this .gitignore and README
 !.gitignore
-!main.py
+!install_win.bat
+!install_mac.sh
 !README.md
-!pattern_editor_panel.py
+
+# include all Python source files
+!*.py
+!**/*.py
 EOF
