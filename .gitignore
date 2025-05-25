@@ -3,4 +3,5 @@ cat > .gitignore <<EOF
 !.gitignore
 !main.py
 !README.md
+!pattern_editor_panel.py
 EOF
