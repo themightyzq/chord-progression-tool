@@ -9,6 +9,10 @@ cat > .gitignore <<EOF
 !.gitignore
 !install_win.bat
 !install_mac.sh
+!run_win.bat
+!run_mac.sh
+!license
+!requirements.txt
 !README.md
 
 # include all Python source files

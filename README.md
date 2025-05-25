@@ -33,48 +33,29 @@ Python dependencies:
 
 ### ✅ macOS
 
-```bash
-# Install Python (if not already installed)
-brew install python
-
-# Install PortAudio (required for playback)
-brew install portaudio
-
-# Clone and enter the project folder
-git clone https://github.com/<yourname>/chord-progression-tool.git
-cd chord-progression-tool
-
-# (Optional) Create and activate virtualenv
-python3 -m venv venv
-source venv/bin/activate
-
-# Install Python dependencies
-pip install -r requirements.txt
-
-# Run the app
-python main.py
-```
+1. Open Terminal and navigate to the project folder.
+2. Run the setup script:
+   ```bash
+   ./install_mac.sh
+   ```
+   This will install Python, PortAudio, create a virtual environment, and install all required Python packages.
+3. To run the app after setup, use:
+   ```bash
+   ./run_mac.sh
+   ```
 
 ### ✅ Windows
 
-1. Install Python 3.9+ from https://python.org
-2. Download and install PortAudio from http://www.portaudio.com/download.html (or install via Chocolatey: `choco install portaudio`)
-3. Clone the project or download ZIP
-4. Open Command Prompt:
-
-```cmd
-cd path\to\chord-progression-tool
-
-# (Optional) Create and activate virtualenv
-python -m venv venv
-venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the app
-python main.py
-```
+1. Open Command Prompt and navigate to the project folder.
+2. Run the setup script:
+   ```cmd
+   install_win.bat
+   ```
+   This will check for Python, install PortAudio (if Chocolatey is available), create a virtual environment, and install all required Python packages.
+3. To run the app after setup, use:
+   ```cmd
+   run_win.bat
+   ```
 
 ---
 
@@ -129,23 +110,17 @@ Note duration is calculated based on tempo and block length.
 
 ## 🛠 Automation
 
-**(Optional)** You can use these shell scripts to install everything automatically:
+For convenience, use the provided scripts for setup and running the app:
 
-### macOS - `install_mac.sh`
-```bash
-#!/bin/bash
-brew install python portaudio
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+- **macOS:**
+  - `install_mac.sh` — Installs all dependencies and sets up the environment.
+  - `run_mac.sh` — Activates the environment and runs the app.
 
-### Windows - `install_win.bat`
-```bat
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-```
+- **Windows:**
+  - `install_win.bat` — Installs all dependencies and sets up the environment.
+  - `run_win.bat` — Activates the environment and runs the app.
+
+No manual installation steps are required—just use the scripts above!
 
 ---
 

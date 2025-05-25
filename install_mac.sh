@@ -19,5 +19,5 @@ source venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
 
-echo "Setup complete. To start the tool:"
-echo "source venv/bin/activate && python main.py"
+echo "Setup complete."
+echo "To run the tool, use: ./run_mac.sh"
