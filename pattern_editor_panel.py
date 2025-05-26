@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QMenu
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QMenu, QDialog
 from PyQt5.QtGui import QPainter, QColor, QPen, QBrush
 from PyQt5.QtCore import Qt, QTimer
 import numpy as np
@@ -160,7 +160,7 @@ class PatternEditorPanel(QWidget):
             if not found_edge:
                 self.setCursor(Qt.ArrowCursor)
     def contextMenuEvent(self, event):
-        # Right-click context menu for deleting/clearing/randomizing a row, or deleting a block
+        # Right-click context menu for deleting/clearing/randomizing a row, editing, or deleting a block
         x, y = event.x(), event.y()
         col, row = self.xy_to_grid(x, y)
         if row is not None and col is not None:
@@ -169,10 +169,14 @@ class PatternEditorPanel(QWidget):
             randomize_action = menu.addAction("Randomize This Row")
             clear_action = menu.addAction("Clear This Row")
 
+            edit_modifiers_action = None
             delete_action = None
+            block_to_edit = None
             for block in reversed(self.blocks):
                 if block["chord_idx"] == row and block["start"] <= col < block["start"] + block["length"]:
+                    edit_modifiers_action = menu.addAction("Edit Block Modifiers...")
                     delete_action = menu.addAction("Delete Block")
+                    block_to_edit = block
                     break
 
             action = menu.exec_(self.mapToGlobal(event.pos()))
@@ -181,6 +185,19 @@ class PatternEditorPanel(QWidget):
                 return
             elif action == clear_action:
                 self.blocks = [b for b in self.blocks if b["chord_idx"] != row]
+                self.update()
+                return
+            elif edit_modifiers_action and action == edit_modifiers_action and block_to_edit is not None:
+                # Open chord modifier dialog for this block
+                from ui.dialogs import EditChordModifiersDialog
+                # Use the base chord as a starting point, but allow overrides
+                chord = self.chords[row].copy()
+                if "modifiers" in block_to_edit and block_to_edit["modifiers"]:
+                    chord.update(block_to_edit["modifiers"])
+                dialog = EditChordModifiersDialog(self, chord)
+                if dialog.exec_() == QDialog.Accepted and dialog.result:
+                    # Save only the modifiers that are set (not the roman)
+                    block_to_edit["modifiers"] = {k: v for k, v in dialog.result.items() if k != "roman"}
                 self.update()
                 return
             elif action and action.text() == "Delete Block":

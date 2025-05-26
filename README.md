@@ -44,6 +44,13 @@ Python dependencies:
    ./run_mac.sh
    ```
 
+**Troubleshooting:**  
+If you get a "permission denied" error when running `./run_mac.sh`, you may need to make the script executable:
+```bash
+chmod +x run_mac.sh
+```
+This step is usually handled automatically by the installer, but if you encounter issues, run the above command and try again.
+
 ### ✅ Windows
 
 1. Open Command Prompt and navigate to the project folder.
@@ -78,9 +85,15 @@ Python dependencies:
 - Each chord becomes a horizontal row.
 - Click and drag blocks to place notes.
 - Drag sides of blocks to set note length (snap to grid).
-- Right-click blocks for more options (delete, randomize, clear row).
+- Right-click blocks for more options (delete, randomize, clear row, **edit block modifiers**).
 - Up to 32 steps total.
 - Up to 8 unique chords can be sequenced.
+
+#### Per-Block Chord Modifier Overrides
+- You can override chord modifiers (extension, inversion, voicing, custom voicing, arpeggiator, etc.) for any block in the pattern editor.
+- Right-click a block and select **Edit Block Modifiers...** to open the chord modifier dialog for that block.
+- Any changes made here will apply only to that block, overriding the base chord's settings for playback and MIDI export.
+- If no block-specific modifiers are set, the chord's global modifiers are used.
 
 ### ⚙️ Session Settings
 - Set tempo (BPM), key, and mode.

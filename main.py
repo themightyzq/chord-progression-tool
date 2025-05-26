@@ -171,25 +171,31 @@ class MainWindow(QWidget):
                     for block in active_blocks:
                         chord_idx = block["chord_idx"]
                         if 0 <= chord_idx < len(self.chord_progression):
-                            chord = self.chord_progression[chord_idx]
+                            base_chord = self.chord_progression[chord_idx]
+                            modifiers = block.get("modifiers", {})
+                            merged_chord = dict(base_chord)
+                            merged_chord.update(modifiers)
                             freqs = self.get_chord_frequencies(
-                                chord["roman"],
-                                chord.get("extension"),
-                                chord.get("inversion"),
-                                chord.get("voicing"),
+                                merged_chord["roman"],
+                                merged_chord.get("extension"),
+                                merged_chord.get("inversion"),
+                                merged_chord.get("voicing"),
                                 key=self.key,
                                 mode=self.mode,
-                                custom_voicing=chord.get("custom_voicing")
+                                custom_voicing=merged_chord.get("custom_voicing")
                             )
-                            arp_mode = chord.get("arp_mode", "None")
-                            arp_length = chord.get("arp_length", "1/16")
+                            arp_mode = merged_chord.get("arp_mode", "None")
+                            arp_length = merged_chord.get("arp_length", "1/16")
                             if arp_mode and arp_mode != "None":
                                 # Step-synchronized arpeggiator: sustain each note for the correct number of steps
+                                # Use the same merged_chord as above
                                 notes = self.get_chord_frequencies(
-                                    chord["roman"], chord.get("extension"),
-                                    chord.get("inversion"), chord.get("voicing"),
+                                    merged_chord["roman"],
+                                    merged_chord.get("extension"),
+                                    merged_chord.get("inversion"),
+                                    merged_chord.get("voicing"),
                                     self.key, self.mode,
-                                    custom_voicing=chord.get("custom_voicing")
+                                    custom_voicing=merged_chord.get("custom_voicing")
                                 )
                                 sequence = get_arpeggio_sequence(notes, arp_mode)
                                 if not hasattr(self, "_arpeggio_positions"):
@@ -219,23 +225,29 @@ class MainWindow(QWidget):
                     for block in blocks_ending:
                         chord_idx = block["chord_idx"]
                         if 0 <= chord_idx < len(self.chord_progression):
-                            chord = self.chord_progression[chord_idx]
+                            base_chord = self.chord_progression[chord_idx]
+                            modifiers = block.get("modifiers", {})
+                            merged_chord = dict(base_chord)
+                            merged_chord.update(modifiers)
                             freqs = self.get_chord_frequencies(
-                                chord["roman"],
-                                chord.get("extension"),
-                                chord.get("inversion"),
-                                chord.get("voicing"),
+                                merged_chord["roman"],
+                                merged_chord.get("extension"),
+                                merged_chord.get("inversion"),
+                                merged_chord.get("voicing"),
                                 key=self.key,
                                 mode=self.mode,
-                                custom_voicing=chord.get("custom_voicing")
+                                custom_voicing=merged_chord.get("custom_voicing")
                             )
-                            arp_mode = chord.get("arp_mode", "None")
+                            arp_mode = merged_chord.get("arp_mode", "None")
                             if arp_mode and arp_mode != "None":
                                 # Step-synchronized arpeggiator: turn off last note and reset position for this block
                                 notes = self.get_chord_frequencies(
-                                    chord["roman"], chord.get("extension"),
-                                    chord.get("inversion"), chord.get("voicing"),
-                                    self.key, self.mode
+                                    merged_chord["roman"],
+                                    merged_chord.get("extension"),
+                                    merged_chord.get("inversion"),
+                                    merged_chord.get("voicing"),
+                                    self.key, self.mode,
+                                    custom_voicing=merged_chord.get("custom_voicing")
                                 )
                                 sequence = get_arpeggio_sequence(notes, arp_mode)
                                 block_id = (block["start"], block["chord_idx"])
@@ -393,19 +405,22 @@ class MainWindow(QWidget):
             for block in blocks:
                 chord_idx = block["chord_idx"]
                 if 0 <= chord_idx < len(self.chord_progression):
-                    chord = self.chord_progression[chord_idx]
+                    base_chord = self.chord_progression[chord_idx]
+                    modifiers = block.get("modifiers", {})
+                    merged_chord = dict(base_chord)
+                    merged_chord.update(modifiers)
                     notes = get_midi_notes(
-                        chord["roman"],
-                        chord.get("extension"),
-                        chord.get("inversion"),
-                        chord.get("voicing"),
+                        merged_chord["roman"],
+                        merged_chord.get("extension"),
+                        merged_chord.get("inversion"),
+                        merged_chord.get("voicing"),
                         key=self.key,
-                        custom_voicing=chord.get("custom_voicing")
+                        custom_voicing=merged_chord.get("custom_voicing")
                     )
                     start = block["start"]
                     end = block["start"] + block["length"]
-                    arp_mode = chord.get("arp_mode", "None")
-                    arp_length = chord.get("arp_length", "1/16")
+                    arp_mode = merged_chord.get("arp_mode", "None")
+                    arp_length = merged_chord.get("arp_length", "1/16")
                     if arp_mode and arp_mode != "None":
                         # Arpeggiated export: only one note on at a time, matching playback
                         from core.arpeggiator import get_arpeggio_sequence
