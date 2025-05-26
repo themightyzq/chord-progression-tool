@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QRadioButton, QButtonGroup, QGroupBox,
-    QComboBox, QDialogButtonBox, QScrollArea, QWidget, QGridLayout, QSizePolicy
+    QComboBox, QDialogButtonBox, QScrollArea, QWidget, QGridLayout, QSizePolicy, QPushButton
 )
 from PyQt5.QtGui import QFont
 
@@ -102,6 +102,34 @@ class EditChordModifiersDialog(QDialog):
         arp_layout.addWidget(self.arp_length_combo, 1, 1)
         main_layout.addWidget(arp_group)
 
+        import random
+        # Randomize button
+        randomize_btn = QPushButton("Randomize")
+        randomize_btn.setStyleSheet(
+            "QPushButton { background: #388e3c; color: white; font-size: 15px; font-weight: bold; border-radius: 10px; padding: 6px 24px; }"
+            "QPushButton:pressed { background: #256029; }"
+        )
+        def randomize_modifiers():
+            # Extension
+            ext_choice = random.choice(ext_options)
+            for btn in self.ext_radios:
+                btn.setChecked(btn.text() == ext_choice)
+            # Inversion
+            inv_choice = random.choice(inv_options)
+            for btn in self.inv_radios:
+                btn.setChecked(btn.text() == inv_choice)
+            # Voicing
+            voi_choice = random.choice(voi_options)
+            for btn in self.voi_radios:
+                btn.setChecked(btn.text() == voi_choice)
+            # Arp mode
+            arp_mode_count = self.arp_mode_combo.count()
+            self.arp_mode_combo.setCurrentIndex(random.randint(0, arp_mode_count - 1))
+            # Arp length
+            arp_len_count = self.arp_length_combo.count()
+            self.arp_length_combo.setCurrentIndex(random.randint(0, arp_len_count - 1))
+        randomize_btn.clicked.connect(randomize_modifiers)
+
         btn_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btn_box.button(QDialogButtonBox.Ok).setStyleSheet(
             "QPushButton { background: #1976d2; color: white; font-size: 15px; font-weight: bold; border-radius: 10px; padding: 6px 24px; }"
@@ -113,6 +141,7 @@ class EditChordModifiersDialog(QDialog):
         )
 
         main_layout.addStretch()
+        main_layout.addWidget(randomize_btn)
         main_layout.addWidget(btn_box)
 
         scroll.setWidget(scroll_contents)

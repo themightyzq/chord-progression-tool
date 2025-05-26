@@ -307,6 +307,24 @@ class StructurePanel(QWidget):
                 """
             )
             mod_row.addWidget(center_wrap(voicing_pill))
+        if chord.get("arp_mode") and chord.get("arp_mode") != "None":
+            arp_pill = QLabel("ARP")
+            arp_pill.setFixedHeight(22)
+            arp_pill.setMinimumHeight(22)
+            arp_pill.setMinimumWidth(44)
+            arp_pill.setAlignment(Qt.AlignCenter)
+            arp_pill.setStyleSheet(
+                f"""
+                background: #fff;
+                color: {color};
+                border: 2px solid {color};
+                border-radius: 8px;
+                font-size: 13px;
+                font-weight: bold;
+                padding: 0px 6px;
+                """
+            )
+            mod_row.addWidget(center_wrap(arp_pill))
         mod_row.addItem(QSpacerItem(4, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
         mod_row_container = QWidget()
         mod_row_container.setLayout(mod_row)
