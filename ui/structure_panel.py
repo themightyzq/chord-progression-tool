@@ -213,7 +213,8 @@ class StructurePanel(QWidget):
                         chord.get("inversion"),
                         chord.get("voicing"),
                         key=parent.key,
-                        mode=parent.mode
+                        mode=parent.mode,
+                        custom_voicing=chord.get("custom_voicing")
                     )
                     parent.play_chord_tone(freqs, duration=0.5, chord=chord)
             return play
@@ -388,4 +389,9 @@ class StructurePanel(QWidget):
             self.chords[idx]["voicing"] = dialog.result.get("voicing")
             self.chords[idx]["arp_mode"] = dialog.result.get("arp_mode")
             self.chords[idx]["arp_length"] = dialog.result.get("arp_length")
+            # Store custom voicing parameters if present
+            if "custom_voicing" in dialog.result:
+                self.chords[idx]["custom_voicing"] = dialog.result["custom_voicing"]
+            else:
+                self.chords[idx].pop("custom_voicing", None)
             self.update_chords(self.chords)

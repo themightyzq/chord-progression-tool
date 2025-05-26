@@ -178,7 +178,8 @@ class MainWindow(QWidget):
                                 chord.get("inversion"),
                                 chord.get("voicing"),
                                 key=self.key,
-                                mode=self.mode
+                                mode=self.mode,
+                                custom_voicing=chord.get("custom_voicing")
                             )
                             arp_mode = chord.get("arp_mode", "None")
                             arp_length = chord.get("arp_length", "1/16")
@@ -187,7 +188,8 @@ class MainWindow(QWidget):
                                 notes = self.get_chord_frequencies(
                                     chord["roman"], chord.get("extension"),
                                     chord.get("inversion"), chord.get("voicing"),
-                                    self.key, self.mode
+                                    self.key, self.mode,
+                                    custom_voicing=chord.get("custom_voicing")
                                 )
                                 sequence = get_arpeggio_sequence(notes, arp_mode)
                                 if not hasattr(self, "_arpeggio_positions"):
@@ -224,7 +226,8 @@ class MainWindow(QWidget):
                                 chord.get("inversion"),
                                 chord.get("voicing"),
                                 key=self.key,
-                                mode=self.mode
+                                mode=self.mode,
+                                custom_voicing=chord.get("custom_voicing")
                             )
                             arp_mode = chord.get("arp_mode", "None")
                             if arp_mode and arp_mode != "None":
@@ -302,7 +305,7 @@ class MainWindow(QWidget):
                 "G": 67, "G#": 68, "A": 69, "A#": 70, "B": 71,
                 "Db": 61, "Eb": 63, "Gb": 66, "Ab": 68, "Bb": 70
             }
-            def get_midi_notes(roman, extension=None, inversion=None, voicing=None, key="C"):
+            def get_midi_notes(roman, extension=None, inversion=None, voicing=None, key="C", custom_voicing=None):
                 # This function should match the get_chord_frequencies logic as close as possible
                 roman_map = {
                     "I": ["C", "E", "G"],
@@ -334,12 +337,32 @@ class MainWindow(QWidget):
                     midi = note_map.get(base, 60) + key_offset
                     midi_notes.append(midi)
                 # Apply voicing
-                if voicing == "Open" and len(midi_notes) >= 3:
-                    # Raise the 2nd note (by chord stack order) by an octave
+                if custom_voicing:
+                    num_notes = custom_voicing.get("num_notes", len(midi_notes))
+                    position = custom_voicing.get("position", 3)
+                    spread = custom_voicing.get("spread", 0)
+                    center = 12 * (position + 1)
+                    midi_notes = sorted(midi_notes)
+                    if num_notes <= 4 or spread == 0:
+                        base = center - 2 * (num_notes // 2)
+                        midi_notes = [base + 2 * i for i in range(num_notes)]
+                    else:
+                        if spread == 1:
+                            midi_notes = [center - 24] + [center - 12 + 4 * i for i in range(num_notes - 2)] + [center + 12]
+                        elif spread == 2:
+                            midi_notes = [center - 24] + [center + i for i in range(num_notes - 1)]
+                        elif spread == 3:
+                            import random
+                            midi_notes = [n for n in range(center - 12, center + 12) if random.random() < 0.7][:num_notes]
+                        elif spread == 4:
+                            midi_notes = [center - 24] + [center + 7 * i for i in range(1, num_notes)]
+                        elif spread == 5:
+                            midi_notes = [center - 24] + [center + 4 * i for i in range(1, num_notes)]
+                    midi_notes = midi_notes[:num_notes]
+                elif voicing == "Open" and len(midi_notes) >= 3:
                     midi_notes = midi_notes[:]
                     midi_notes[1] += 12
                 elif voicing == "Drop 2" and len(midi_notes) >= 3:
-                    # Lower the 2nd highest note by an octave
                     midi_notes = midi_notes[:]
                     sorted_idx = sorted(range(len(midi_notes)), key=lambda i: midi_notes[i], reverse=True)
                     idx_2nd_highest = sorted_idx[1]
@@ -376,7 +399,8 @@ class MainWindow(QWidget):
                         chord.get("extension"),
                         chord.get("inversion"),
                         chord.get("voicing"),
-                        key=self.key
+                        key=self.key,
+                        custom_voicing=chord.get("custom_voicing")
                     )
                     start = block["start"]
                     end = block["start"] + block["length"]
@@ -503,7 +527,7 @@ class MainWindow(QWidget):
         self.settings_panel.setSizePolicy(self.settings_panel.sizePolicy().Expanding, self.settings_panel.sizePolicy().Expanding)
 
         # Add get_chord_frequencies method for StructurePanel play button
-        def get_chord_frequencies(self, roman, extension=None, inversion=None, voicing=None, key=None, mode=None):
+        def get_chord_frequencies(self, roman, extension=None, inversion=None, voicing=None, key=None, mode=None, custom_voicing=None):
             print(f"[DEBUG] get_chord_frequencies called with roman={roman}, extension={extension}, inversion={inversion}, voicing={voicing}, key={key}, mode={mode}")
             # Note names and their indices
             note_names_sharp = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
@@ -603,7 +627,42 @@ class MainWindow(QWidget):
                     midi -= 12
                 midi_notes.append(midi)
             # Apply voicing
-            if voicing == "Open" and len(midi_notes) >= 3:
+            if custom_voicing:
+                # Custom voicing logic
+                num_notes = custom_voicing.get("num_notes", len(midi_notes))
+                position = custom_voicing.get("position", 3)
+                note_range = custom_voicing.get("range", len(midi_notes))
+                spread = custom_voicing.get("spread", 0)
+                # Center note is at MIDI octave (position), so center = 12 * (position + 1)
+                center = 12 * (position + 1)
+                # Spread notes around the center, within the allowed range
+                midi_notes = sorted(midi_notes)
+                # Stack in thirds for <=4 notes, otherwise apply spread logic
+                if num_notes <= 4 or spread == 0:
+                    # Stack in thirds, centered
+                    base = center - 2 * (num_notes // 2)
+                    midi_notes = [base + 2 * i for i in range(num_notes)]
+                else:
+                    # For spread > 0, implement basic open/closed voicing logic as a placeholder
+                    # (Full spread logic can be expanded as needed)
+                    if spread == 1:
+                        # Root in bass, open mid, closed high, root high
+                        midi_notes = [center - 24] + [center - 12 + 4 * i for i in range(num_notes - 2)] + [center + 12]
+                    elif spread == 2:
+                        # Root in bass, closed 4th octave
+                        midi_notes = [center - 24] + [center + i for i in range(num_notes - 1)]
+                    elif spread == 3:
+                        # 70% chance for any pad note
+                        import random
+                        midi_notes = [n for n in range(center - 12, center + 12) if random.random() < 0.7][:num_notes]
+                    elif spread == 4:
+                        # Root in bass, root+5ths above
+                        midi_notes = [center - 24] + [center + 7 * i for i in range(1, num_notes)]
+                    elif spread == 5:
+                        # Root in bass, 3rds or 7ths above
+                        midi_notes = [center - 24] + [center + 4 * i for i in range(1, num_notes)]
+                midi_notes = midi_notes[:num_notes]
+            elif voicing == "Open" and len(midi_notes) >= 3:
                 midi_notes = midi_notes[:]
                 midi_notes[1] += 12
             elif voicing == "Drop 2" and len(midi_notes) >= 3:
@@ -731,6 +790,13 @@ if __name__ == "__main__":
         }
         QComboBox:focus, QSpinBox:focus {
             border: 2px solid #1976d2;
+        }
+        QToolTip {
+            color: #222;
+            background: #ffffe0;
+            border: 1px solid #888;
+            font-size: 15px;
+            font-family: Palatino, Georgia, serif;
         }
         /* Global stylesheet */
         QLabel, QPushButton {
