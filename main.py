@@ -380,9 +380,37 @@ class MainWindow(QWidget):
                     )
                     start = block["start"]
                     end = block["start"] + block["length"]
-                    for n in notes:
-                        events.append((start, "on", n))
-                        events.append((end, "off", n))
+                    arp_mode = chord.get("arp_mode", "None")
+                    arp_length = chord.get("arp_length", "1/16")
+                    if arp_mode and arp_mode != "None":
+                        # Arpeggiated export: only one note on at a time, matching playback
+                        from core.arpeggiator import get_arpeggio_sequence
+                        sequence = get_arpeggio_sequence(notes, arp_mode)
+                        arp_length_map = {"1/16": 1, "1/8": 2, "1/4": 4, "1/2": 8}
+                        steps_per_arp_note = arp_length_map.get(arp_length, 1)
+                        num_notes = len(sequence)
+                        total_steps = end - start
+                        prev_note = None
+                        for step_offset in range(0, total_steps, steps_per_arp_note):
+                            pos = step_offset // steps_per_arp_note
+                            note_idx = pos % num_notes
+                            n = sequence[note_idx]
+                            note_on_step = start + step_offset
+                            note_off_step = min(note_on_step + steps_per_arp_note, end)
+                            # Turn off previous note before turning on the next
+                            if prev_note is not None:
+                                events.append((note_on_step, "off", prev_note))
+                            events.append((note_on_step, "on", n))
+                            events.append((note_off_step, "off", n))
+                            prev_note = n
+                        # At the end of the block, ensure the last note is turned off (if not already)
+                        # (Handled by the above loop, but this is a safety net)
+                        # No need to turn off prev_note here, as it's handled at note_off_step
+                    else:
+                        # Block chord export
+                        for n in notes:
+                            events.append((start, "on", n))
+                            events.append((end, "off", n))
             # Sort events by step, with note_off before note_on at same step
             events.sort(key=lambda e: (e[0], 0 if e[1] == "off" else 1))
             # Calculate ticks per step
