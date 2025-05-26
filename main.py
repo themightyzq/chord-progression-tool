@@ -500,14 +500,10 @@ class MainWindow(QWidget):
 
         # Chord Panel
         self.chord_panel = ChordPanel(on_select, on_add, self.selected_roman)
-        self.chord_panel.setMinimumWidth(340)
-        self.chord_panel.setMaximumWidth(420)
         self.chord_panel.setSizePolicy(self.chord_panel.sizePolicy().Expanding, self.chord_panel.sizePolicy().Expanding)
 
         # Chord Structure Panel
         self.structure_panel = StructurePanel(self.chord_progression, on_delete)
-        self.structure_panel.setMinimumWidth(340)
-        self.structure_panel.setMaximumWidth(420)
         self.structure_panel.setSizePolicy(self.structure_panel.sizePolicy().Expanding, self.structure_panel.sizePolicy().Expanding)
 
         # Handlers for key/mode selection (must be defined before panel creation)
@@ -537,8 +533,6 @@ class MainWindow(QWidget):
             self.key, set_key, self.mode, set_mode,
             self.pattern_bars, set_pattern_bars, self.quantization, set_quantization
         )
-        self.settings_panel.setMinimumWidth(340)
-        self.settings_panel.setMaximumWidth(420)
         self.settings_panel.setSizePolicy(self.settings_panel.sizePolicy().Expanding, self.settings_panel.sizePolicy().Expanding)
 
         # Add get_chord_frequencies method for StructurePanel play button
@@ -714,8 +708,7 @@ class MainWindow(QWidget):
         main_layout.addWidget(scroll, 1)
 
         self.setLayout(main_layout)
-        self.setMinimumSize(1200, 800)  # Adjust window size to fit panels comfortably
-        self.setMaximumSize(1600, 1200)
+        self.setSizePolicy(self.sizePolicy().Expanding, self.sizePolicy().Expanding)
 
         # Set tab order for accessibility (explicitly across panels)
         if hasattr(self.chord_panel, "add_btn"):
@@ -771,6 +764,14 @@ class MainWindow(QWidget):
             super().keyPressEvent(event)
 
 if __name__ == "__main__":
+    # Enable high-DPI scaling for better cross-platform and resolution independence
+    import os
+    os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "1"
+    os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
+    from PyQt5.QtCore import Qt
+    from PyQt5.QtWidgets import QApplication
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
     app = QApplication([])
     # Set global font and stylesheet for professional, accessible look
     from PyQt5.QtGui import QFont, QFontDatabase
@@ -782,15 +783,15 @@ if __name__ == "__main__":
         QWidget {
             color: #222;
             background: #faf9f6;
-            font-family: Palatino, Georgia, serif;
-            font-size: 18px;
+            font-family: Palatino, Georgia, serif, system-ui, sans-serif;
+            font-size: 1.1em;
         }
         QLabel {
             color: #222;
         }
         QPushButton {
-            font-family: Palatino, Georgia, serif;
-            font-size: 18px;
+            font-family: Palatino, Georgia, serif, system-ui, sans-serif;
+            font-size: 1.1em;
             font-weight: bold;
             outline: none;
         }
@@ -798,8 +799,8 @@ if __name__ == "__main__":
             outline: 2px solid #1976d2; outline-offset: 2px;
         }
         QComboBox, QSpinBox {
-            font-family: Palatino, Georgia, serif;
-            font-size: 16px;
+            font-family: Palatino, Georgia, serif, system-ui, sans-serif;
+            font-size: 1em;
             color: #222;
             background: #fff;
         }
@@ -810,13 +811,13 @@ if __name__ == "__main__":
             color: #222;
             background: #ffffe0;
             border: 1px solid #888;
-            font-size: 15px;
-            font-family: Palatino, Georgia, serif;
+            font-size: 0.95em;
+            font-family: Palatino, Georgia, serif, system-ui, sans-serif;
         }
         /* Global stylesheet */
         QLabel, QPushButton {
-            font-family: "Palatino", "Georgia", serif;
-            font-size: 16pt;
+            font-family: "Palatino", "Georgia", serif, system-ui, sans-serif;
+            font-size: 1.1em;
             font-weight: bold;
         }
     """)
