@@ -13,6 +13,7 @@ cat > .gitignore <<EOF
 !run_mac.sh
 !license
 !requirements.txt
+!style.qss
 !README.md
 
 # include all Python source files

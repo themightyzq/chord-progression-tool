@@ -779,48 +779,12 @@ if __name__ == "__main__":
     base_font.setFamily("Palatino" if QFont("Palatino").exactMatch() else "Georgia")
     base_font.setPointSizeF(base_font.pointSizeF() * app.devicePixelRatio())
     app.setFont(base_font)
-    app.setStyleSheet("""
-        QWidget {
-            color: #222;
-            background: #faf9f6;
-            font-family: Palatino, Georgia, serif, system-ui, sans-serif;
-            font-size: 1.1em;
-        }
-        QLabel {
-            color: #222;
-        }
-        QPushButton {
-            font-family: Palatino, Georgia, serif, system-ui, sans-serif;
-            font-size: 1.1em;
-            font-weight: bold;
-            outline: none;
-        }
-        QPushButton:focus, QComboBox:focus, QSpinBox:focus {
-            outline: 2px solid #1976d2; outline-offset: 2px;
-        }
-        QComboBox, QSpinBox {
-            font-family: Palatino, Georgia, serif, system-ui, sans-serif;
-            font-size: 1em;
-            color: #222;
-            background: #fff;
-        }
-        QComboBox:focus, QSpinBox:focus {
-            border: 2px solid #1976d2;
-        }
-        QToolTip {
-            color: #222;
-            background: #ffffe0;
-            border: 1px solid #888;
-            font-size: 0.95em;
-            font-family: Palatino, Georgia, serif, system-ui, sans-serif;
-        }
-        /* Global stylesheet */
-        QLabel, QPushButton {
-            font-family: "Palatino", "Georgia", serif, system-ui, sans-serif;
-            font-size: 1.1em;
-            font-weight: bold;
-        }
-    """)
+    # Load and apply external stylesheet for all visual settings
+    try:
+        with open("style.qss", "r") as f:
+            app.setStyleSheet(f.read())
+    except Exception as e:
+        print(f"Failed to load stylesheet: {e}")
     window = MainWindow()
     # Remove setTabOrder for add_btn (no longer present)
     # window.setTabOrder(window.chord_panel.add_btn, window.settings_panel.play_btn)

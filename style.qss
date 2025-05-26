@@ -1,0 +1,40 @@
+QWidget {
+    color: #222;
+    background: #faf9f6;
+    font-family: Palatino, Georgia, serif, system-ui, sans-serif;
+    font-size: 1.1em;
+}
+QLabel {
+    color: #222;
+}
+QPushButton {
+    font-family: Palatino, Georgia, serif, system-ui, sans-serif;
+    font-size: 1.1em;
+    font-weight: bold;
+    outline: none;
+}
+QPushButton:focus, QComboBox:focus, QSpinBox:focus {
+    outline: 2px solid #1976d2; outline-offset: 2px;
+}
+QComboBox, QSpinBox {
+    font-family: Palatino, Georgia, serif, system-ui, sans-serif;
+    font-size: 1em;
+    color: #222;
+    background: #fff;
+}
+QComboBox:focus, QSpinBox:focus {
+    border: 2px solid #1976d2;
+}
+QToolTip {
+    color: #222;
+    background: #ffffe0;
+    border: 1px solid #888;
+    font-size: 0.95em;
+    font-family: Palatino, Georgia, serif, system-ui, sans-serif;
+}
+/* Global stylesheet */
+QLabel, QPushButton {
+    font-family: "Palatino", "Georgia", serif, system-ui, sans-serif;
+    font-size: 1.1em;
+    font-weight: bold;
+}
