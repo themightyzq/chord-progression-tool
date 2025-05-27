@@ -159,7 +159,7 @@ class MainWindow(QWidget):
                         fade = np.linspace(1, 0, int(fs * duration))
                         click = click * fade
                         try:
-                            sd.play(click, fs, blocking=False)
+                            sd.play(click, fs, blocking=True)
                         except Exception as e:
                             print(f"[ERROR] Click track playback failed: {e}")
                             print("If you are on Windows, ensure the 'sounddevice' package and PortAudio are installed and your audio device is available.")
