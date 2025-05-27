@@ -159,10 +159,16 @@ class MainWindow(QWidget):
                         fade = np.linspace(1, 0, int(fs * duration))
                         click = click * fade
                         try:
-                            sd.play(click, fs, blocking=True)
+                            sd.stop()
+                            sd.default.samplerate = fs
+                            sd.default.channels = 1
+                            sd.default.dtype = 'float32'
+                            sd.default.device = None  # Let it auto-select
+                            sd.play(click.astype(np.float32), samplerate=fs, blocking=True)
                         except Exception as e:
                             print(f"[ERROR] Click track playback failed: {e}")
-                            print("If you are on Windows, ensure the 'sounddevice' package and PortAudio are installed and your audio device is available.")
+                            import traceback
+                            traceback.print_exc()
 
                     blocks = pattern_panel.blocks if pattern_panel else []
                     print(f"[DEBUG] Blocks at step {step_idx}: {blocks}")
