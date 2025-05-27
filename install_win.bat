@@ -1,35 +1,60 @@
 @echo off
 echo Installing dependencies for Windows...
+echo.
+echo If this window closes immediately, please run this script from an open Command Prompt window for better error visibility.
+echo.
 
 REM Check if Python is installed
 where python >nul 2>nul
 if errorlevel 1 (
-    echo Python not found. Please install Python 3.9+ from https://www.python.org/
+    echo [ERROR] Python not found. Please install Python 3.9+ from https://www.python.org/downloads/
+    pause
     exit /b
 )
 
 REM Check if Chocolatey is installed
 where choco >nul 2>nul
 if errorlevel 1 (
-    echo Chocolatey not found. Please install PortAudio manually from http://www.portaudio.com/download.html
-    echo Or install Chocolatey from https://chocolatey.org/install and re-run this script.
-) else (
-    echo PortAudio cannot be installed automatically via Chocolatey.
-    echo Please download the PortAudio DLL manually from:
+    echo [INFO] Chocolatey not found. PortAudio must be installed manually.
+    echo.
+    echo Download PortAudio from:
     echo   https://www.portaudio.com/download.html
-    echo and place portaudio_x64.dll (or portaudio.dll) in the project folder, venv\Scripts, or a folder in your PATH.
+    echo.
+    echo Place 'portaudio_x64.dll' or 'portaudio.dll' in one of the following:
+    echo   - This project folder
+    echo   - venv\Scripts
+    echo   - Any folder in your system PATH
+) else (
+    echo [INFO] Chocolatey found, but PortAudio must still be installed manually.
+    echo Download and install from:
+    echo   https://www.portaudio.com/download.html
 )
 
-REM Create and activate virtual environment
+REM Create virtual environment
+echo.
+echo Creating Python virtual environment...
 python -m venv venv
+if errorlevel 1 (
+    echo [ERROR] Failed to create virtual environment.
+    pause
+    exit /b
+)
+
+REM Activate virtual environment
+echo Activating virtual environment...
 call venv\Scripts\activate
 
-REM Upgrade pip and install Python dependencies
+REM Upgrade pip and install requirements
+echo Installing Python dependencies...
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 
 echo.
-echo IMPORTANT: If you see audio playback issues, ensure you have manually downloaded the PortAudio DLL and placed it in the correct location as described above.
-echo Setup complete.
-echo To run the tool, use: run_win.bat
+echo ===============================
+echo Setup complete!
+echo ===============================
+echo.
+echo IMPORTANT: Make sure PortAudio DLL is placed correctly for audio playback.
+echo Run the app using:
+echo   call venv\Scripts\activate && python main.py
 pause
