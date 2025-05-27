@@ -58,7 +58,21 @@ This step is usually handled automatically by the installer, but if you encounte
    ```cmd
    install_win.bat
    ```
-   This will check for Python, install PortAudio (if Chocolatey is available), create a virtual environment, and install all required Python packages.
+   This will check for Python, attempt to install PortAudio (if Chocolatey is available), create a virtual environment, and install all required Python packages.
+
+   **Important:**  
+   If you see an error about PortAudio not being installed, you must install the PortAudio DLL manually for reliable audio playback:
+   - Download the prebuilt PortAudio DLL for Windows from the official site:  
+     https://www.portaudio.com/download.html  
+     (Look for "Precompiled Windows DLL" or similar.)
+   - Place the downloaded `portaudio_x64.dll` (or `portaudio.dll`) in one of the following locations:
+     - The project root directory (where `main.py` is located)
+     - The `venv/Scripts` directory
+     - Any folder included in your system `PATH`
+   - Restart the app after placing the DLL.
+
+   Without the PortAudio DLL, audio playback may be delayed, stutter, or fail entirely.
+
 3. To run the app after setup, use:
    ```cmd
    run_win.bat
