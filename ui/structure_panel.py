@@ -26,6 +26,7 @@ class StructurePanel(QWidget):
         card_frame.setStyleSheet(PANEL_STYLE)
         card_frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setMinimumHeight(PANEL_H)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         card_layout = QVBoxLayout(card_frame)
         card_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
         card_layout.setSpacing(12)
