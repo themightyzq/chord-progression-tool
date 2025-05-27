@@ -22,12 +22,13 @@ class ChordPanel(QWidget):
         self.selected_roman = None
         self.setStyleSheet("background: #ffffff; border-radius: 20px;")
         
+        from PyQt5.QtWidgets import QSizePolicy
+
         card_frame = QFrame(self)
         card_frame.setMinimumWidth(PANEL_W)
-        card_frame.setMaximumWidth(PANEL_W)
         card_frame.setMinimumHeight(PANEL_H)
-        card_frame.setMaximumHeight(PANEL_H)
         card_frame.setStyleSheet(PANEL_STYLE)
+        card_frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         card_layout = QVBoxLayout(card_frame)
         card_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)

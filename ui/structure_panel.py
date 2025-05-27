@@ -18,14 +18,14 @@ class StructurePanel(QWidget):
         super().__init__()
         self.chords = chords
         self.on_delete = on_delete
+        from PyQt5.QtWidgets import QSizePolicy
+
         card_frame = QFrame(self)
         card_frame.setMinimumWidth(PANEL_W)
-        card_frame.setMaximumWidth(PANEL_W)
         card_frame.setMinimumHeight(PANEL_H)
-        card_frame.setMaximumHeight(PANEL_H)
         card_frame.setStyleSheet(PANEL_STYLE)
+        card_frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setMinimumHeight(PANEL_H)
-        self.setMaximumHeight(PANEL_H)
         card_layout = QVBoxLayout(card_frame)
         card_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
         card_layout.setSpacing(12)
