@@ -277,6 +277,41 @@ class MainWindow(QWidget):
                     step_idx += 1
                     if step_idx >= pattern_length:
                         if self.loop_enabled:
+                            # Before looping, turn off any notes that should end at or after the pattern boundary
+                            if pattern_panel:
+                                blocks = pattern_panel.blocks
+                                for block in blocks:
+                                    block_end = block["start"] + block["length"]
+                                    if block_end >= pattern_length:
+                                        chord_idx = block["chord_idx"]
+                                        if 0 <= chord_idx < len(self.chord_progression):
+                                            base_chord = self.chord_progression[chord_idx]
+                                            modifiers = block.get("modifiers", {})
+                                            merged_chord = dict(base_chord)
+                                            merged_chord.update(modifiers)
+                                            freqs = self.get_chord_frequencies(
+                                                merged_chord["roman"],
+                                                merged_chord.get("extension"),
+                                                merged_chord.get("inversion"),
+                                                merged_chord.get("voicing"),
+                                                key=self.key,
+                                                mode=self.mode,
+                                                custom_voicing=merged_chord.get("custom_voicing")
+                                            )
+                                            arp_mode = merged_chord.get("arp_mode", "None")
+                                            if arp_mode and arp_mode != "None":
+                                                # For arpeggiator, turn off last note if held
+                                                block_id = (block["start"], block["chord_idx"])
+                                                if hasattr(self, "_arpeggio_last_notes"):
+                                                    last_note = self._arpeggio_last_notes.get(block_id)
+                                                    if last_note is not None:
+                                                        self.synth.note_off([last_note])
+                                                    self._arpeggio_last_notes.pop(block_id, None)
+                                                if hasattr(self, "_arpeggio_positions"):
+                                                    if block_id in self._arpeggio_positions:
+                                                        del self._arpeggio_positions[block_id]
+                                            else:
+                                                self.synth.note_off(freqs)
                             # Wait for any running arpeggiator threads to finish before looping
                             if hasattr(self, "_arpeggio_threads"):
                                 for t in self._arpeggio_threads:
