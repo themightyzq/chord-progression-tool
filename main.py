@@ -53,7 +53,7 @@ class MainWindow(QWidget):
         columns_layout = QHBoxLayout()
         columns_layout.setSpacing(24)  # Reduced spacing between panels
         columns_layout.setContentsMargins(20, 20, 20, 20)  # Add margins around the layout
-        columns_layout.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        # Removed setAlignment to allow panels to expand and fill space naturally
 
         # State for selected chord and progression (must be defined before panel creation)
         self.selected_roman = None
