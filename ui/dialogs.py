@@ -114,29 +114,34 @@ class EditChordModifiersDialog(QDialog):
         # Number of notes
         num_notes_label = QLabel("Number of Notes:")
         num_notes_label.setToolTip("How many notes will be played in the chord.")
+        num_notes_label.setFont(QFont("Palatino" if QFont("Palatino").exactMatch() else "Georgia", 12))
         custom_voicing_layout.addWidget(num_notes_label, 0, 0)
         self.num_notes_spin = QSpinBox()
         self.num_notes_spin.setRange(1, 22)
         self.num_notes_spin.setValue(3)
         self.num_notes_spin.setToolTip("How many notes will be played in the chord.")
+        self.num_notes_spin.setFont(QFont("Palatino" if QFont("Palatino").exactMatch() else "Georgia", 12))
         custom_voicing_layout.addWidget(self.num_notes_spin, 0, 1)
 
         # Position (center note, MIDI octave 0-7)
         position_label = QLabel("Position (Octave):")
         position_label.setToolTip("The center octave for the chord voicing (0 = C0, 7 = C7).")
+        position_label.setFont(QFont("Palatino" if QFont("Palatino").exactMatch() else "Georgia", 12))
         custom_voicing_layout.addWidget(position_label, 1, 0)
         self.position_spin = QSpinBox()
         self.position_spin.setRange(0, 7)
         self.position_spin.setValue(3)
         self.position_spin.setToolTip("The center octave for the chord voicing (0 = C0, 7 = C7).")
+        self.position_spin.setFont(QFont("Palatino" if QFont("Palatino").exactMatch() else "Georgia", 12))
         custom_voicing_layout.addWidget(self.position_spin, 1, 1)
-
 
         # Spread (ComboBox with 6 types)
         spread_label = QLabel("Spread Type:")
         spread_label.setToolTip("How the notes are distributed across the keyboard. Hover each option for details.")
+        spread_label.setFont(QFont("Palatino" if QFont("Palatino").exactMatch() else "Georgia", 12))
         custom_voicing_layout.addWidget(spread_label, 3, 0)
         self.spread_combo = QComboBox()
+        self.spread_combo.setFont(QFont("Palatino" if QFont("Palatino").exactMatch() else "Georgia", 12))
         spread_titles = [
             "Stacked Thirds",
             "Layered Voicing",
