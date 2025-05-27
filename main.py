@@ -106,13 +106,14 @@ class MainWindow(QWidget):
                 sequence = get_arpeggio_sequence(notes, arp_mode)
                 duration_map = {"1/16": 0.125, "1/8": 0.25, "1/4": 0.5, "1/2": 1.0}
                 note_duration = duration_map.get(arp_length, 0.125)
+                # Scale note_duration by tempo (120 = default)
+                note_duration *= (120 / self.tempo)
                 for note in sequence:
                     t = np.linspace(0, note_duration, int(fs * note_duration), False)
                     audio = 0.3 * np.sin(2 * np.pi * note * t)
                     audio = audio / np.max(np.abs(audio)) if np.max(np.abs(audio)) != 0 else audio
                     print(f"[DEBUG] Playing arpeggiated note {note} for {note_duration}s")
-                    sd.play(audio, fs)
-                    sd.wait()
+                    sd.play(audio, samplerate=fs, blocking=True)
                 return
 
             # Otherwise, play all notes in unison
@@ -158,17 +159,17 @@ class MainWindow(QWidget):
                         click = 0.5 * np.sin(2 * np.pi * freq * t)
                         fade = np.linspace(1, 0, int(fs * duration))
                         click = click * fade
+                        click_audio = click.astype(np.float32)
                         try:
-                            sd.stop()
-                            sd.default.samplerate = fs
-                            sd.default.channels = 1
-                            sd.default.dtype = 'float32'
-                            sd.default.device = None  # Let it auto-select
-                            sd.play(click.astype(np.float32), samplerate=fs, blocking=True)
+                            with sd.OutputStream(
+                                samplerate=fs,
+                                channels=1,
+                                dtype='float32',
+                                device=None  # Auto-select
+                            ) as stream:
+                                stream.write(click_audio)
                         except Exception as e:
-                            print(f"[ERROR] Click track playback failed: {e}")
-                            import traceback
-                            traceback.print_exc()
+                            print(f"[ERROR] Click track stream failed: {e}")
 
                     blocks = pattern_panel.blocks if pattern_panel else []
                     print(f"[DEBUG] Blocks at step {step_idx}: {blocks}")
