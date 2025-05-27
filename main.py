@@ -158,7 +158,11 @@ class MainWindow(QWidget):
                         click = 0.5 * np.sin(2 * np.pi * freq * t)
                         fade = np.linspace(1, 0, int(fs * duration))
                         click = click * fade
-                        sd.play(click, fs, blocking=False)
+                        try:
+                            sd.play(click, fs, blocking=False)
+                        except Exception as e:
+                            print(f"[ERROR] Click track playback failed: {e}")
+                            print("If you are on Windows, ensure the 'sounddevice' package and PortAudio are installed and your audio device is available.")
 
                     blocks = pattern_panel.blocks if pattern_panel else []
                     print(f"[DEBUG] Blocks at step {step_idx}: {blocks}")
