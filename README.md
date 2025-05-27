@@ -19,7 +19,6 @@ Built with **Python + PyQt5**, this app supports:
 
 - Python 3.9+
 - macOS or Windows
-- PortAudio (required for `sounddevice` module)
 
 Python dependencies:
 - `PyQt5`
@@ -38,7 +37,7 @@ Python dependencies:
    ```bash
    ./install_mac.sh
    ```
-   This will install Python, PortAudio, create a virtual environment, and install all required Python packages.
+   This will install Python, create a virtual environment, and install all required Python packages. (PortAudio is handled internally.)
 3. To run the app after setup, use:
    ```bash
    ./run_mac.sh
@@ -67,8 +66,6 @@ This step is usually handled automatically by the installer, but if you encounte
    ```cmd
    run_win.bat
    ```
-
-**Note:** If audio playback fails, ensure that your default audio device is working and that no other software is blocking system audio access. Most users should not need to install PortAudio manually.
 
 ---
 
